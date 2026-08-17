@@ -112,7 +112,10 @@ if submit_button:
         with st.spinner("Procesando datos con los modelos SVR y GBR..."):
             
             # C) INFERENCIA SVR (Ansiedad y Estrés)
-            pred_svr = svr_model.predict(input_data)
+            try:
+                pred_svr = svr_model.predict(input_data)
+            except Exception as e:
+                st.error(f"Error detallado en la predicción: {e}")
             
             # Manejo por si SVR devuelve un array 2D
             if pred_svr.ndim > 1:
@@ -123,7 +126,11 @@ if submit_button:
                 nivel_estres = pred_svr[1]
                 
             # D) INFERENCIA GBR (Depresión)
-            pred_gbr = gbr_model.predict(input_data)
+            try:
+                pred_gbr = svr_model.predict(input_data)
+            except Exception as e:
+                st.error(f"Error detallado en la predicción: {e}")
+                
             nivel_depresion = pred_gbr[0]
             
             # E) REGLAS Y UMBRALES
