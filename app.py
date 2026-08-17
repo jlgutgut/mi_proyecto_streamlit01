@@ -31,8 +31,8 @@ st.markdown("""
 @st.cache_resource
 def load_trained_models():
     try:
-        svr_model = joblib.load('best_svr_models.pkl') 
-        gbr_model = joblib.load('best_gbr_models.pkl')
+        svr_model = joblib.load('modelos/best_svr_models.pkl') 
+        gbr_model = joblib.load('modelos/best_gbr_models.pkl')
         return svr_model, gbr_model
     except FileNotFoundError as e:
         st.error(f"⚠️ No se encontró el archivo del modelo: {e.filename}.")
