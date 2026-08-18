@@ -16,25 +16,27 @@ st.set_page_config(
 # -----------------------------------------------------------------------------
 @st.cache_resource
 @st.cache_resource
+@st.cache_resource
 def load_trained_models():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     path_svr = os.path.join(base_dir, 'modelos', 'best_svr_models.pkl')
     path_gbr = os.path.join(base_dir, 'modelos', 'best_gbr_models.pkl')
     
-    # Comprobación de existencia de rutas
+    # 1. Comprobar existencia en disco
     if not os.path.exists(path_svr):
-        st.error(f"❌ No se encontró el archivo SVR en: {path_svr}")
+        st.error(f"❌ Archivo no encontrado: {path_svr}")
         return None, None
     if not os.path.exists(path_gbr):
-        st.error(f"❌ No se encontró el archivo GBR en: {path_gbr}")
+        st.error(f"❌ Archivo no encontrado: {path_gbr}")
         return None, None
 
+    # 2. Intentar cargar con Joblib
     try:
         pack_svr = joblib.load(path_svr)
         pack_gbr = joblib.load(path_gbr)
         return pack_svr, pack_gbr
     except Exception as e:
-        st.error(f"⚠️ Error al abrir con joblib ({type(e).__name__}): {e}")
+        st.error(f"⚠️ Error abriendo archivos con joblib ({type(e).__name__}): {e}")
         return None, None
 
 # Cargar paquetes al iniciar la aplicación
