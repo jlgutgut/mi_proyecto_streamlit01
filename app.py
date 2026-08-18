@@ -1,11 +1,12 @@
 import os
 import joblib
+import numpy as np
 import pandas as pd
 import streamlit as st
 
 
 # =========================================================
-# 1. CONFIGURACIÓN DE PÁGINA
+# 1. CONFIGURACIÓN
 # =========================================================
 
 st.set_page_config(
@@ -56,11 +57,11 @@ st.markdown("""
 
 
 # =========================================================
-# 3. CARGA DE MODELOS
+# 3. CARGAR MODELOS
 # =========================================================
 
 @st.cache_resource
-def load_trained_models():
+def load_models():
 
     base_dir = os.path.dirname(
         os.path.abspath(__file__)
@@ -81,139 +82,199 @@ def load_trained_models():
         "best_gbr_models.pkl"
     )
 
-    svr_model = None
-    gbr_model = None
+    svr = None
+    gbr = None
 
     # -----------------------------------------------------
     # SVR
     # -----------------------------------------------------
 
-    if not os.path.exists(path_svr):
+    try:
 
-        st.error(
-            "❌ No se encontró el archivo:\n\n"
-            f"{path_svr}"
-        )
-
-    else:
-
-        try:
-
-            svr_model = joblib.load(
-                path_svr
-            )
-
-            st.success(
-                "✅ Modelo SVR cargado correctamente"
-            )
-
-        except Exception as e:
+        if not os.path.exists(path_svr):
 
             st.error(
-                "❌ Error cargando SVR"
+                f"❌ No existe el archivo SVR:\n{path_svr}"
             )
 
-            st.exception(e)
+        else:
+
+            svr = joblib.load(path_svr)
+
+            st.success(
+                "✅ SVR cargado correctamente"
+            )
+
+    except Exception as e:
+
+        st.error("❌ Error cargando SVR")
+        st.exception(e)
 
 
     # -----------------------------------------------------
     # GBR
     # -----------------------------------------------------
 
-    if not os.path.exists(path_gbr):
+    try:
 
-        st.error(
-            "❌ No se encontró el archivo:\n\n"
-            f"{path_gbr}"
-        )
-
-    else:
-
-        try:
-
-            gbr_model = joblib.load(
-                path_gbr
-            )
-
-            st.success(
-                "✅ Modelo GBR cargado correctamente"
-            )
-
-        except Exception as e:
+        if not os.path.exists(path_gbr):
 
             st.error(
-                "❌ Error cargando GBR"
+                f"❌ No existe el archivo GBR:\n{path_gbr}"
             )
 
-            st.exception(e)
+        else:
+
+            gbr = joblib.load(path_gbr)
+
+            st.success(
+                "✅ GBR cargado correctamente"
+            )
+
+    except Exception as e:
+
+        st.error("❌ Error cargando GBR")
+        st.exception(e)
 
 
-    return svr_model, gbr_model
+    return svr, gbr
 
 
-# Cargar modelos
-
-svr_model, gbr_model = load_trained_models()
-
-
-# =========================================================
-# 4. VALIDAR MODELOS
-# =========================================================
-
-required_keys = [
-    "ansiedad",
-    "estres",
-    "depresion",
-    "scaler",
-    "feature_columns",
-    "numeric_columns"
-]
-
-
-if svr_model is not None:
-
-    missing_svr = [
-        key
-        for key in required_keys
-        if key not in svr_model
-    ]
-
-    if missing_svr:
-
-        st.error(
-            "❌ Al modelo SVR le faltan estas claves:"
-        )
-
-        st.write(
-            missing_svr
-        )
-
-        st.stop()
-
-
-if gbr_model is not None:
-
-    missing_gbr = [
-        key
-        for key in required_keys
-        if key not in gbr_model
-    ]
-
-    if missing_gbr:
-
-        st.error(
-            "❌ Al modelo GBR le faltan estas claves:"
-        )
-
-        st.write(
-            missing_gbr
-        )
-
-        st.stop()
+svr_model, gbr_model = load_models()
 
 
 # =========================================================
-# 5. TÍTULO
+# 4. VALIDACIÓN
+# =========================================================
+
+if svr_model is None or gbr_model is None:
+
+    st.error(
+        "❌ No se pudieron cargar ambos modelos."
+    )
+
+    st.stop()
+
+
+# =========================================================
+# 5. OBTENER LAS COLUMNAS REALES DE CADA MODELO
+# =========================================================
+
+svr_ansiedad = svr_model["ansiedad"]
+svr_estres = svr_model["estres"]
+svr_depresion = svr_model["depresion"]
+
+gbr_ansiedad = gbr_model["ansiedad"]
+gbr_estres = gbr_model["estres"]
+gbr_depresion = gbr_model["depresion"]
+
+
+# =========================================================
+# COLUMNAS QUE REALMENTE RECIBIÓ CADA MODELO DURANTE FIT()
+# =========================================================
+
+svr_columns = list(
+    svr_ansiedad.feature_names_in_
+)
+
+gbr_columns = list(
+    gbr_ansiedad.feature_names_in_
+)
+
+
+# =========================================================
+# COLUMNAS DEL SCALER
+# =========================================================
+
+svr_scaler = svr_model["scaler"]
+gbr_scaler = gbr_model["scaler"]
+
+
+if hasattr(
+    svr_scaler,
+    "feature_names_in_"
+):
+
+    svr_scaler_columns = list(
+        svr_scaler.feature_names_in_
+    )
+
+else:
+
+    svr_scaler_columns = list(
+        svr_model["numeric_columns"]
+    )
+
+
+if hasattr(
+    gbr_scaler,
+    "feature_names_in_"
+):
+
+    gbr_scaler_columns = list(
+        gbr_scaler.feature_names_in_
+    )
+
+else:
+
+    gbr_scaler_columns = list(
+        gbr_model["numeric_columns"]
+    )
+
+
+# =========================================================
+# INFORMACIÓN TÉCNICA
+# =========================================================
+
+with st.sidebar:
+
+    st.header("🔧 Información técnica")
+
+    st.write(
+        "**SVR recibió durante entrenamiento:**"
+    )
+
+    st.write(svr_columns)
+
+    st.write(
+        "**GBR recibió durante entrenamiento:**"
+    )
+
+    st.write(gbr_columns)
+
+    st.write(
+        "**Scaler SVR recibió:**"
+    )
+
+    st.write(svr_scaler_columns)
+
+    st.write(
+        "**Scaler GBR recibió:**"
+    )
+
+    st.write(gbr_scaler_columns)
+
+    st.markdown("---")
+
+    st.write(
+        f"SVR: {len(svr_columns)} variables"
+    )
+
+    st.write(
+        f"GBR: {len(gbr_columns)} variables"
+    )
+
+    st.write(
+        f"Scaler SVR: {len(svr_scaler_columns)} variables"
+    )
+
+    st.write(
+        f"Scaler GBR: {len(gbr_scaler_columns)} variables"
+    )
+
+
+# =========================================================
+# 6. TÍTULO
 # =========================================================
 
 st.title(
@@ -221,18 +282,17 @@ st.title(
 )
 
 st.write(
-    "Ingrese las variables descriptivas. "
-    "El sistema utilizará los modelos preentrenados "
-    "SVR y GBR para realizar las predicciones."
+    "Ingrese las variables descriptivas para "
+    "realizar la predicción."
 )
 
 
 # =========================================================
-# 6. FORMULARIO
+# 7. FORMULARIO
 # =========================================================
 
 with st.form(
-    key="mental_health_form"
+    "mental_health_form"
 ):
 
     st.subheader(
@@ -242,9 +302,9 @@ with st.form(
     col1, col2, col3 = st.columns(3)
 
 
-    # =====================================================
+    # -----------------------------------------------------
     # COLUMNA 1
-    # =====================================================
+    # -----------------------------------------------------
 
     with col1:
 
@@ -257,7 +317,7 @@ with st.form(
 
         sexo = st.selectbox(
             "2. Sexo",
-            options=[
+            [
                 "Masculino",
                 "Femenino",
                 "Otro"
@@ -287,9 +347,9 @@ with st.form(
         )
 
 
-    # =====================================================
+    # -----------------------------------------------------
     # COLUMNA 2
-    # =====================================================
+    # -----------------------------------------------------
 
     with col2:
 
@@ -322,9 +382,9 @@ with st.form(
         )
 
 
-    # =====================================================
+    # -----------------------------------------------------
     # COLUMNA 3
-    # =====================================================
+    # -----------------------------------------------------
 
     with col3:
 
@@ -357,43 +417,21 @@ with st.form(
         )
 
 
-    # =====================================================
-    # BOTÓN
-    # =====================================================
-
     submit_button = st.form_submit_button(
-        label="🚀 Ejecutar Diagnóstico Predictivo",
+        "🚀 Ejecutar Diagnóstico Predictivo",
         use_container_width=True,
         type="primary"
     )
 
 
 # =========================================================
-# 7. PREDICCIÓN
+# 8. PREDICCIÓN
 # =========================================================
 
 if submit_button:
 
-    if svr_model is None:
-
-        st.error(
-            "❌ El modelo SVR no está disponible."
-        )
-
-        st.stop()
-
-
-    if gbr_model is None:
-
-        st.error(
-            "❌ El modelo GBR no está disponible."
-        )
-
-        st.stop()
-
-
     # =====================================================
-    # 8. CODIFICAR SEXO
+    # CODIFICACIÓN DE SEXO
     # =====================================================
 
     if sexo == "Masculino":
@@ -413,7 +451,7 @@ if submit_button:
 
 
     # =====================================================
-    # 9. CONSTRUIR DATAFRAME
+    # DATAFRAME COMPLETO DE ENTRADA
     # =====================================================
 
     input_data = pd.DataFrame([{
@@ -448,318 +486,474 @@ if submit_button:
 
         "sexo_otro":
             sexo_otro
-
     }])
 
 
     # =====================================================
-    # 10. OBTENER COLUMNAS DEL MODELO
+    # MOSTRAR ENTRADA
     # =====================================================
 
-    feature_columns_svr = list(
-        svr_model["feature_columns"]
-    )
-
-    feature_columns_gbr = list(
-        gbr_model["feature_columns"]
-    )
-
-
-    # =====================================================
-    # 11. OBTENER COLUMNAS DEL SCALER
-    # =====================================================
-
-    scaler_svr = svr_model[
-        "scaler"
-    ]
-
-    scaler_gbr = gbr_model[
-        "scaler"
-    ]
-
-
-    # -----------------------------------------------------
-    # Columnas reales utilizadas durante fit()
-    # -----------------------------------------------------
-
-    if hasattr(
-        scaler_svr,
-        "feature_names_in_"
+    with st.expander(
+        "🔍 Ver datos ingresados"
     ):
 
-        scaler_columns_svr = list(
-            scaler_svr.feature_names_in_
-        )
-
-    else:
-
-        scaler_columns_svr = list(
-            svr_model["numeric_columns"]
+        st.dataframe(
+            input_data,
+            use_container_width=True
         )
 
 
-    if hasattr(
-        scaler_gbr,
-        "feature_names_in_"
+    # =====================================================
+    # EJECUTAR PREDICCIÓN
+    # =====================================================
+
+    with st.spinner(
+        "Procesando predicciones..."
     ):
 
-        scaler_columns_gbr = list(
-            scaler_gbr.feature_names_in_
-        )
+        try:
 
-    else:
+            # =================================================
+            # =================================================
+            #                       SVR
+            # =================================================
+            # =================================================
 
-        scaler_columns_gbr = list(
-            gbr_model["numeric_columns"]
-        )
+            # -------------------------------------------------
+            # SVR fue entrenado SOLO con 12 columnas
+            # -------------------------------------------------
 
-
-    # =====================================================
-    # 12. VALIDACIÓN DE COLUMNAS
-    # =====================================================
-
-    missing_svr = [
-        col
-        for col in feature_columns_svr
-        if col not in input_data.columns
-    ]
-
-    missing_gbr = [
-        col
-        for col in feature_columns_gbr
-        if col not in input_data.columns
-    ]
+            X_svr = input_data[
+                svr_columns
+            ].copy()
 
 
-    if missing_svr:
+            # -------------------------------------------------
+            # IMPORTANTE:
+            #
+            # El scaler SVR también fue entrenado con esas
+            # mismas 12 columnas.
+            # -------------------------------------------------
 
-        st.error(
-            "❌ Faltan columnas para SVR:"
-        )
-
-        st.write(
-            missing_svr
-        )
-
-        st.stop()
-
-
-    if missing_gbr:
-
-        st.error(
-            "❌ Faltan columnas para GBR:"
-        )
-
-        st.write(
-            missing_gbr
-        )
-
-        st.stop()
+            X_svr_scaled = svr_scaler.transform(
+                X_svr
+            )
 
 
-    # =====================================================
-    # 13. EJECUTAR PREDICCIONES
-    # =====================================================
-# =====================================================
-# 13. EJECUTAR PREDICCIONES
-# =====================================================
+            # -------------------------------------------------
+            # Convertir nuevamente a DataFrame
+            # -------------------------------------------------
 
-with st.spinner("Procesando predicción..."):
-
-    try:
-
-        # =================================================
-        # ==================== SVR ========================
-        # =================================================
-
-        # -------------------------------------------------
-        # Crear las 14 variables en el orden exacto
-        # utilizado durante el entrenamiento
-        # -------------------------------------------------
-
-        X_svr = input_data[
-            feature_columns_svr
-        ].copy()
-
-        # Asegurar que todas sean numéricas
-        X_svr = X_svr.astype(float)
-
-        # -------------------------------------------------
-        # ESCALAR SOLO LAS VARIABLES QUE EL SCALER
-        # UTILIZÓ DURANTE EL ENTRENAMIENTO
-        #
-        # IMPORTANTE:
-        # Se convierte a NumPy antes de transform().
-        # Esto evita el error de feature_names.
-        # -------------------------------------------------
-
-        X_svr_scaled = scaler_svr.transform(
-            X_svr[
-                scaler_columns_svr
-            ].to_numpy()
-        )
-
-        # Convertir nuevamente las 12 variables escaladas
-        # a DataFrame
-
-        X_svr_scaled_df = pd.DataFrame(
-            X_svr_scaled,
-            columns=scaler_columns_svr,
-            index=X_svr.index
-        )
-
-        # -------------------------------------------------
-        # Recuperar las variables sexo SIN ESCALAR
-        # -------------------------------------------------
-
-        for col in feature_columns_svr:
-
-            if col not in scaler_columns_svr:
-
-                X_svr_scaled_df[col] = (
-                    X_svr[col].values
-                )
-
-        # -------------------------------------------------
-        # Volver a colocar las 14 variables en el orden
-        # exacto utilizado durante el entrenamiento
-        # -------------------------------------------------
-
-        X_svr_final = X_svr_scaled_df[
-            feature_columns_svr
-        ].copy()
-
-        # Asegurar tipo numérico
-
-        X_svr_final = X_svr_final.astype(float)
-
-        # -------------------------------------------------
-        # PREDICCIÓN SVR - ANSIEDAD
-        # -------------------------------------------------
-
-        nivel_ansiedad_svr = float(
-            svr_model["ansiedad"].predict(
-                X_svr_final
-            )[0]
-        )
-
-        # -------------------------------------------------
-        # PREDICCIÓN SVR - ESTRÉS
-        # -------------------------------------------------
-
-        nivel_estres_svr = float(
-            svr_model["estres"].predict(
-                X_svr_final
-            )[0]
-        )
-
-        # -------------------------------------------------
-        # PREDICCIÓN SVR - DEPRESIÓN
-        # -------------------------------------------------
-
-        nivel_depresion_svr = float(
-            svr_model["depresion"].predict(
-                X_svr_final
-            )[0]
-        )
+            X_svr_scaled = pd.DataFrame(
+                X_svr_scaled,
+                columns=svr_columns,
+                index=X_svr.index
+            )
 
 
-        # =================================================
-        # ==================== GBR ========================
-        # =================================================
+            # -------------------------------------------------
+            # Predicciones SVR
+            # -------------------------------------------------
 
-        # -------------------------------------------------
-        # Crear las 14 variables
-        # -------------------------------------------------
+            nivel_ansiedad_svr = float(
+                svr_ansiedad.predict(
+                    X_svr_scaled
+                )[0]
+            )
 
-        X_gbr = input_data[
-            feature_columns_gbr
-        ].copy()
+            nivel_estres_svr = float(
+                svr_estres.predict(
+                    X_svr_scaled
+                )[0]
+            )
 
-        # Asegurar que sean numéricas
+            nivel_depresion_svr = float(
+                svr_depresion.predict(
+                    X_svr_scaled
+                )[0]
+            )
 
-        X_gbr = X_gbr.astype(float)
 
-        # -------------------------------------------------
-        # ESCALAR SOLO LAS VARIABLES NUMÉRICAS
-        #
-        # También usamos NumPy para evitar cualquier
-        # comprobación de nombres por parte de sklearn.
-        # -------------------------------------------------
+            # =================================================
+            # =================================================
+            #                       GBR
+            # =================================================
+            # =================================================
 
-        X_gbr_scaled = scaler_gbr.transform(
+            # -------------------------------------------------
+            # GBR fue entrenado con 14 columnas
+            # -------------------------------------------------
+
+            X_gbr = input_data[
+                gbr_columns
+            ].copy()
+
+
+            # -------------------------------------------------
+            # El scaler GBR solo escaló 12 columnas
+            # -------------------------------------------------
+
             X_gbr[
-                scaler_columns_gbr
-            ].to_numpy()
+                gbr_scaler_columns
+            ] = gbr_scaler.transform(
+                X_gbr[
+                    gbr_scaler_columns
+                ]
+            )
+
+
+            # -------------------------------------------------
+            # Predicciones GBR
+            # -------------------------------------------------
+
+            nivel_ansiedad_gbr = float(
+                gbr_ansiedad.predict(
+                    X_gbr
+                )[0]
+            )
+
+            nivel_estres_gbr = float(
+                gbr_estres.predict(
+                    X_gbr
+                )[0]
+            )
+
+            nivel_depresion_gbr = float(
+                gbr_depresion.predict(
+                    X_gbr
+                )[0]
+            )
+
+
+        except Exception as e:
+
+            st.error(
+                "❌ Error durante la predicción"
+            )
+
+            st.exception(e)
+
+            st.stop()
+
+
+    # =====================================================
+    # 9. RESULTADOS PRINCIPALES
+    # =====================================================
+
+    # Tu aplicación utiliza:
+    #
+    # Ansiedad  → SVR
+    # Estrés    → SVR
+    # Depresión → GBR
+
+    nivel_ansiedad = (
+        nivel_ansiedad_svr
+    )
+
+    nivel_estres = (
+        nivel_estres_svr
+    )
+
+    nivel_depresion = (
+        nivel_depresion_gbr
+    )
+
+
+    # =====================================================
+    # UMBRALES
+    # =====================================================
+
+    ansiedad_threshold = 18
+    estres_threshold = 8
+    depresion_threshold = 5
+
+
+    # =====================================================
+    # ESTADOS
+    # =====================================================
+
+    ansiedad_alta = (
+        nivel_ansiedad >=
+        ansiedad_threshold
+    )
+
+    estres_alto = (
+        nivel_estres >=
+        estres_threshold
+    )
+
+    depresion_alta = (
+        nivel_depresion >=
+        depresion_threshold
+    )
+
+
+    # =====================================================
+    # RESULTADOS
+    # =====================================================
+
+    st.markdown("---")
+
+    st.subheader(
+        "📊 Resultados de la Evaluación"
+    )
+
+    res1, res2, res3 = st.columns(3)
+
+
+    # =====================================================
+    # ANSIEDAD
+    # =====================================================
+
+    with res1:
+
+        st.markdown(
+            '<div class="metric-card">',
+            unsafe_allow_html=True
         )
 
-        # Convertir las variables escaladas a DataFrame
-
-        X_gbr_scaled_df = pd.DataFrame(
-            X_gbr_scaled,
-            columns=scaler_columns_gbr,
-            index=X_gbr.index
+        st.metric(
+            "Ansiedad (SVR)",
+            f"{nivel_ansiedad:.2f}"
         )
 
-        # -------------------------------------------------
-        # Recuperar sexo SIN ESCALAR
-        # -------------------------------------------------
+        if ansiedad_alta:
 
-        for col in feature_columns_gbr:
+            st.markdown(
+                f"""
+                <div class="status-alert status-high">
+                    😞 Elevado
+                    (Umbral: {ansiedad_threshold})
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-            if col not in scaler_columns_gbr:
+        else:
 
-                X_gbr_scaled_df[col] = (
-                    X_gbr[col].values
-                )
+            st.markdown(
+                f"""
+                <div class="status-alert status-low">
+                    😊 Normal
+                    (Umbral: {ansiedad_threshold})
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
 
-        # -------------------------------------------------
-        # Orden final de las 14 variables
-        # -------------------------------------------------
-
-        X_gbr_final = X_gbr_scaled_df[
-            feature_columns_gbr
-        ].copy()
-
-        X_gbr_final = X_gbr_final.astype(float)
-
-        # -------------------------------------------------
-        # PREDICCIÓN GBR - ANSIEDAD
-        # -------------------------------------------------
-
-        nivel_ansiedad_gbr = float(
-            gbr_model["ansiedad"].predict(
-                X_gbr_final
-            )[0]
-        )
-
-        # -------------------------------------------------
-        # PREDICCIÓN GBR - ESTRÉS
-        # -------------------------------------------------
-
-        nivel_estres_gbr = float(
-            gbr_model["estres"].predict(
-                X_gbr_final
-            )[0]
-        )
-
-        # -------------------------------------------------
-        # PREDICCIÓN GBR - DEPRESIÓN
-        # -------------------------------------------------
-
-        nivel_depresion_gbr = float(
-            gbr_model["depresion"].predict(
-                X_gbr_final
-            )[0]
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
         )
 
 
-    except Exception as e:
+    # =====================================================
+    # ESTRÉS
+    # =====================================================
 
-        st.error(
-            "❌ Error durante la predicción"
+    with res2:
+
+        st.markdown(
+            '<div class="metric-card">',
+            unsafe_allow_html=True
         )
 
-        st.exception(e)
+        st.metric(
+            "Estrés (SVR)",
+            f"{nivel_estres:.2f}"
+        )
 
-        st.stop()
+        if estres_alto:
+
+            st.markdown(
+                f"""
+                <div class="status-alert status-high">
+                    😞 Elevado
+                    (Umbral: {estres_threshold})
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        else:
+
+            st.markdown(
+                f"""
+                <div class="status-alert status-low">
+                    😊 Normal
+                    (Umbral: {estres_threshold})
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
+
+
+    # =====================================================
+    # DEPRESIÓN
+    # =====================================================
+
+    with res3:
+
+        st.markdown(
+            '<div class="metric-card">',
+            unsafe_allow_html=True
+        )
+
+        st.metric(
+            "Depresión (GBR)",
+            f"{nivel_depresion:.2f}"
+        )
+
+        if depresion_alta:
+
+            st.markdown(
+                f"""
+                <div class="status-alert status-high">
+                    😞 Elevado
+                    (Umbral: {depresion_threshold})
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        else:
+
+            st.markdown(
+                f"""
+                <div class="status-alert status-low">
+                    😊 Normal
+                    (Umbral: {depresion_threshold})
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
+
+
+    # =====================================================
+    # 10. COMPARACIÓN DE MODELOS
+    # =====================================================
+
+    st.markdown("---")
+
+    st.subheader(
+        "🔎 Comparación SVR vs GBR"
+    )
+
+    comparacion = pd.DataFrame({
+
+        "Variable": [
+            "Ansiedad",
+            "Estrés",
+            "Depresión"
+        ],
+
+        "SVR": [
+            nivel_ansiedad_svr,
+            nivel_estres_svr,
+            nivel_depresion_svr
+        ],
+
+        "GBR": [
+            nivel_ansiedad_gbr,
+            nivel_estres_gbr,
+            nivel_depresion_gbr
+        ]
+
+    })
+
+    comparacion["SVR"] = (
+        comparacion["SVR"].round(2)
+    )
+
+    comparacion["GBR"] = (
+        comparacion["GBR"].round(2)
+    )
+
+    st.dataframe(
+        comparacion,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+    # =====================================================
+    # 11. RESULTADO TÉCNICO
+    # =====================================================
+
+    with st.expander(
+        "🔧 Ver configuración de los modelos"
+    ):
+
+        st.write(
+            "### SVR"
+        )
+
+        st.write(
+            "Columnas utilizadas durante el entrenamiento:"
+        )
+
+        st.code(
+            str(svr_columns)
+        )
+
+        st.write(
+            f"Cantidad: {len(svr_columns)}"
+        )
+
+
+        st.write(
+            "### GBR"
+        )
+
+        st.write(
+            "Columnas utilizadas durante el entrenamiento:"
+        )
+
+        st.code(
+            str(gbr_columns)
+        )
+
+        st.write(
+            f"Cantidad: {len(gbr_columns)}"
+        )
+
+
+        st.write(
+            "### Scaler SVR"
+        )
+
+        st.code(
+            str(svr_scaler_columns)
+        )
+
+
+        st.write(
+            "### Scaler GBR"
+        )
+
+        st.code(
+            str(gbr_scaler_columns)
+        )
+
+
+# =========================================================
+# 12. PIE DE PÁGINA
+# =========================================================
+
+st.markdown("---")
+
+st.caption(
+    "Los resultados son predicciones generadas por "
+    "modelos de aprendizaje automático y no constituyen "
+    "un diagnóstico clínico."
+)
