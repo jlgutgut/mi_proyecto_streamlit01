@@ -560,537 +560,206 @@ if submit_button:
     # =====================================================
     # 13. EJECUTAR PREDICCIONES
     # =====================================================
+# =====================================================
+# 13. EJECUTAR PREDICCIONES
+# =====================================================
 
-    with st.spinner(
-        "Procesando predicción..."
-    ):
+with st.spinner("Procesando predicción..."):
 
-        try:
+    try:
 
-            # =================================================
-            # ==================== SVR ========================
-            # =================================================
+        # =================================================
+        # ==================== SVR ========================
+        # =================================================
 
-            # Crear dataframe con las 14 variables
+        # -------------------------------------------------
+        # Crear las 14 variables en el orden exacto
+        # utilizado durante el entrenamiento
+        # -------------------------------------------------
 
-            X_svr = input_data[
-                feature_columns_svr
-            ].copy()
+        X_svr = input_data[
+            feature_columns_svr
+        ].copy()
 
+        # Asegurar que todas sean numéricas
+        X_svr = X_svr.astype(float)
 
-            # -----------------------------------------------
-            # Escalar SOLO las 12 variables que conoce
-            # el StandardScaler
-            # -----------------------------------------------
+        # -------------------------------------------------
+        # ESCALAR SOLO LAS VARIABLES QUE EL SCALER
+        # UTILIZÓ DURANTE EL ENTRENAMIENTO
+        #
+        # IMPORTANTE:
+        # Se convierte a NumPy antes de transform().
+        # Esto evita el error de feature_names.
+        # -------------------------------------------------
 
+        X_svr_scaled = scaler_svr.transform(
             X_svr[
                 scaler_columns_svr
-            ] = scaler_svr.transform(
-                X_svr[
-                    scaler_columns_svr
-                ]
-            )
+            ].to_numpy()
+        )
+
+        # Convertir nuevamente las 12 variables escaladas
+        # a DataFrame
+
+        X_svr_scaled_df = pd.DataFrame(
+            X_svr_scaled,
+            columns=scaler_columns_svr,
+            index=X_svr.index
+        )
+
+        # -------------------------------------------------
+        # Recuperar las variables sexo SIN ESCALAR
+        # -------------------------------------------------
+
+        for col in feature_columns_svr:
+
+            if col not in scaler_columns_svr:
+
+                X_svr_scaled_df[col] = (
+                    X_svr[col].values
+                )
+
+        # -------------------------------------------------
+        # Volver a colocar las 14 variables en el orden
+        # exacto utilizado durante el entrenamiento
+        # -------------------------------------------------
+
+        X_svr_final = X_svr_scaled_df[
+            feature_columns_svr
+        ].copy()
+
+        # Asegurar tipo numérico
+
+        X_svr_final = X_svr_final.astype(float)
+
+        # -------------------------------------------------
+        # PREDICCIÓN SVR - ANSIEDAD
+        # -------------------------------------------------
+
+        nivel_ansiedad_svr = float(
+            svr_model["ansiedad"].predict(
+                X_svr_final
+            )[0]
+        )
+
+        # -------------------------------------------------
+        # PREDICCIÓN SVR - ESTRÉS
+        # -------------------------------------------------
+
+        nivel_estres_svr = float(
+            svr_model["estres"].predict(
+                X_svr_final
+            )[0]
+        )
+
+        # -------------------------------------------------
+        # PREDICCIÓN SVR - DEPRESIÓN
+        # -------------------------------------------------
+
+        nivel_depresion_svr = float(
+            svr_model["depresion"].predict(
+                X_svr_final
+            )[0]
+        )
 
 
-            # -----------------------------------------------
-            # Predicción de ansiedad
-            # -----------------------------------------------
+        # =================================================
+        # ==================== GBR ========================
+        # =================================================
 
-            nivel_ansiedad_svr = float(
-                svr_model[
-                    "ansiedad"
-                ].predict(
-                    X_svr
-                )[0]
-            )
+        # -------------------------------------------------
+        # Crear las 14 variables
+        # -------------------------------------------------
 
+        X_gbr = input_data[
+            feature_columns_gbr
+        ].copy()
 
-            # -----------------------------------------------
-            # Predicción de estrés
-            # -----------------------------------------------
+        # Asegurar que sean numéricas
 
-            nivel_estres_svr = float(
-                svr_model[
-                    "estres"
-                ].predict(
-                    X_svr
-                )[0]
-            )
+        X_gbr = X_gbr.astype(float)
 
+        # -------------------------------------------------
+        # ESCALAR SOLO LAS VARIABLES NUMÉRICAS
+        #
+        # También usamos NumPy para evitar cualquier
+        # comprobación de nombres por parte de sklearn.
+        # -------------------------------------------------
 
-            # -----------------------------------------------
-            # Predicción de depresión con SVR
-            # -----------------------------------------------
-
-            nivel_depresion_svr = float(
-                svr_model[
-                    "depresion"
-                ].predict(
-                    X_svr
-                )[0]
-            )
-
-
-            # =================================================
-            # ==================== GBR ========================
-            # =================================================
-
-            # Crear dataframe con las 14 variables
-
-            X_gbr = input_data[
-                feature_columns_gbr
-            ].copy()
-
-
-            # -----------------------------------------------
-            # Escalar SOLO las columnas que conoce
-            # el StandardScaler
-            # -----------------------------------------------
-
+        X_gbr_scaled = scaler_gbr.transform(
             X_gbr[
                 scaler_columns_gbr
-            ] = scaler_gbr.transform(
-                X_gbr[
-                    scaler_columns_gbr
-                ]
-            )
-
-
-            # -----------------------------------------------
-            # Predicción de ansiedad GBR
-            # -----------------------------------------------
-
-            nivel_ansiedad_gbr = float(
-                gbr_model[
-                    "ansiedad"
-                ].predict(
-                    X_gbr
-                )[0]
-            )
-
-
-            # -----------------------------------------------
-            # Predicción de estrés GBR
-            # -----------------------------------------------
-
-            nivel_estres_gbr = float(
-                gbr_model[
-                    "estres"
-                ].predict(
-                    X_gbr
-                )[0]
-            )
-
-
-            # -----------------------------------------------
-            # Predicción de depresión GBR
-            # -----------------------------------------------
-
-            nivel_depresion_gbr = float(
-                gbr_model[
-                    "depresion"
-                ].predict(
-                    X_gbr
-                )[0]
-            )
-
-
-        except Exception as e:
-
-            st.error(
-                "❌ Error durante la predicción"
-            )
-
-            st.exception(e)
-
-            st.stop()
-
-
-    # =====================================================
-    # 14. RESULTADOS PRINCIPALES
-    # =====================================================
-
-    # Según tu diseño:
-    #
-    # Ansiedad  -> SVR
-    # Estrés    -> SVR
-    # Depresión -> GBR
-
-    nivel_ansiedad = (
-        nivel_ansiedad_svr
-    )
-
-    nivel_estres = (
-        nivel_estres_svr
-    )
-
-    nivel_depresion = (
-        nivel_depresion_gbr
-    )
-
-
-    # =====================================================
-    # 15. UMBRALES
-    # =====================================================
-
-    ansiedad_threshold = 18
-
-    estres_threshold = 8
-
-    depresion_threshold = 5
-
-
-    # =====================================================
-    # 16. ESTADOS
-    # =====================================================
-
-    ansiedad_alta = (
-        nivel_ansiedad >=
-        ansiedad_threshold
-    )
-
-    estres_alto = (
-        nivel_estres >=
-        estres_threshold
-    )
-
-    depresion_alta = (
-        nivel_depresion >=
-        depresion_threshold
-    )
-
-
-    # =====================================================
-    # 17. EMOJIS
-    # =====================================================
-
-    ansiedad_emoji = (
-        "😞"
-        if ansiedad_alta
-        else "😊"
-    )
-
-    estres_emoji = (
-        "😞"
-        if estres_alto
-        else "😊"
-    )
-
-    depresion_emoji = (
-        "😞"
-        if depresion_alta
-        else "😊"
-    )
-
-
-    # =====================================================
-    # 18. MOSTRAR RESULTADOS
-    # =====================================================
-
-    st.markdown("---")
-
-    st.subheader(
-        "📊 Resultados de la Evaluación"
-    )
-
-
-    res_col1, res_col2, res_col3 = (
-        st.columns(3)
-    )
-
-
-    # =====================================================
-    # ANSIEDAD
-    # =====================================================
-
-    with res_col1:
-
-        st.markdown(
-            '<div class="metric-card">',
-            unsafe_allow_html=True
+            ].to_numpy()
         )
 
-        st.metric(
-            label="Ansiedad (SVR)",
-            value=f"{nivel_ansiedad:.2f}"
+        # Convertir las variables escaladas a DataFrame
+
+        X_gbr_scaled_df = pd.DataFrame(
+            X_gbr_scaled,
+            columns=scaler_columns_gbr,
+            index=X_gbr.index
         )
 
-        status_class = (
-            "status-high"
-            if ansiedad_alta
-            else "status-low"
-        )
+        # -------------------------------------------------
+        # Recuperar sexo SIN ESCALAR
+        # -------------------------------------------------
 
-        status_text = (
-            "Elevado"
-            if ansiedad_alta
-            else "Normal"
-        )
+        for col in feature_columns_gbr:
 
-        st.markdown(
-            f"""
-            <div class="status-alert {status_class}">
-                {ansiedad_emoji}
-                {status_text}
-                (Umbral: {ansiedad_threshold})
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+            if col not in scaler_columns_gbr:
 
-        st.markdown(
-            "</div>",
-            unsafe_allow_html=True
-        )
+                X_gbr_scaled_df[col] = (
+                    X_gbr[col].values
+                )
 
+        # -------------------------------------------------
+        # Orden final de las 14 variables
+        # -------------------------------------------------
 
-    # =====================================================
-    # ESTRÉS
-    # =====================================================
-
-    with res_col2:
-
-        st.markdown(
-            '<div class="metric-card">',
-            unsafe_allow_html=True
-        )
-
-        st.metric(
-            label="Estrés (SVR)",
-            value=f"{nivel_estres:.2f}"
-        )
-
-        status_class = (
-            "status-high"
-            if estres_alto
-            else "status-low"
-        )
-
-        status_text = (
-            "Elevado"
-            if estres_alto
-            else "Normal"
-        )
-
-        st.markdown(
-            f"""
-            <div class="status-alert {status_class}">
-                {estres_emoji}
-                {status_text}
-                (Umbral: {estres_threshold})
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.markdown(
-            "</div>",
-            unsafe_allow_html=True
-        )
-
-
-    # =====================================================
-    # DEPRESIÓN
-    # =====================================================
-
-    with res_col3:
-
-        st.markdown(
-            '<div class="metric-card">',
-            unsafe_allow_html=True
-        )
-
-        st.metric(
-            label="Depresión (GBR)",
-            value=f"{nivel_depresion:.2f}"
-        )
-
-        status_class = (
-            "status-high"
-            if depresion_alta
-            else "status-low"
-        )
-
-        status_text = (
-            "Elevado"
-            if depresion_alta
-            else "Normal"
-        )
-
-        st.markdown(
-            f"""
-            <div class="status-alert {status_class}">
-                {depresion_emoji}
-                {status_text}
-                (Umbral: {depresion_threshold})
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.markdown(
-            "</div>",
-            unsafe_allow_html=True
-        )
-
-
-    # =====================================================
-    # 19. COMPARACIÓN SVR VS GBR
-    # =====================================================
-
-    st.markdown("---")
-
-    st.subheader(
-        "🔎 Comparación SVR vs GBR"
-    )
-
-
-    comparacion = pd.DataFrame({
-
-        "Variable": [
-            "Ansiedad",
-            "Estrés",
-            "Depresión"
-        ],
-
-        "SVR": [
-            nivel_ansiedad_svr,
-            nivel_estres_svr,
-            nivel_depresion_svr
-        ],
-
-        "GBR": [
-            nivel_ansiedad_gbr,
-            nivel_estres_gbr,
-            nivel_depresion_gbr
-        ]
-
-    })
-
-
-    comparacion["SVR"] = (
-        comparacion["SVR"].round(2)
-    )
-
-    comparacion["GBR"] = (
-        comparacion["GBR"].round(2)
-    )
-
-
-    st.dataframe(
-        comparacion,
-        use_container_width=True,
-        hide_index=True
-    )
-
-
-    # =====================================================
-    # 20. INFORMACIÓN TÉCNICA
-    # =====================================================
-
-    with st.expander(
-        "🔧 Información técnica"
-    ):
-
-        st.write(
-            "**Columnas del modelo SVR:**"
-        )
-
-        st.write(
-            feature_columns_svr
-        )
-
-
-        st.write(
-            "**Columnas escaladas por SVR:**"
-        )
-
-        st.write(
-            scaler_columns_svr
-        )
-
-
-        st.write(
-            "**Columnas del modelo GBR:**"
-        )
-
-        st.write(
+        X_gbr_final = X_gbr_scaled_df[
             feature_columns_gbr
+        ].copy()
+
+        X_gbr_final = X_gbr_final.astype(float)
+
+        # -------------------------------------------------
+        # PREDICCIÓN GBR - ANSIEDAD
+        # -------------------------------------------------
+
+        nivel_ansiedad_gbr = float(
+            gbr_model["ansiedad"].predict(
+                X_gbr_final
+            )[0]
+        )
+
+        # -------------------------------------------------
+        # PREDICCIÓN GBR - ESTRÉS
+        # -------------------------------------------------
+
+        nivel_estres_gbr = float(
+            gbr_model["estres"].predict(
+                X_gbr_final
+            )[0]
+        )
+
+        # -------------------------------------------------
+        # PREDICCIÓN GBR - DEPRESIÓN
+        # -------------------------------------------------
+
+        nivel_depresion_gbr = float(
+            gbr_model["depresion"].predict(
+                X_gbr_final
+            )[0]
         )
 
 
-        st.write(
-            "**Columnas escaladas por GBR:**"
+    except Exception as e:
+
+        st.error(
+            "❌ Error durante la predicción"
         )
 
-        st.write(
-            scaler_columns_gbr
-        )
+        st.exception(e)
 
-
-        st.write(
-            "**Número de variables del modelo SVR:**",
-            len(feature_columns_svr)
-        )
-
-        st.write(
-            "**Número de variables del scaler SVR:**",
-            len(scaler_columns_svr)
-        )
-
-        st.write(
-            "**Número de variables del modelo GBR:**",
-            len(feature_columns_gbr)
-        )
-
-        st.write(
-            "**Número de variables del scaler GBR:**",
-            len(scaler_columns_gbr)
-        )
-
-
-# =========================================================
-# 21. BARRA LATERAL
-# =========================================================
-
-with st.sidebar:
-
-    st.header(
-        "ℹ️ Información"
-    )
-
-    st.write(
-        "**Modelos utilizados:**"
-    )
-
-    st.write(
-        "• SVR → Ansiedad"
-    )
-
-    st.write(
-        "• SVR → Estrés"
-    )
-
-    st.write(
-        "• GBR → Depresión"
-    )
-
-    st.markdown("---")
-
-    st.write(
-        "Los modelos fueron entrenados "
-        "previamente en Google Colab."
-    )
-
-    st.write(
-        "Los archivos `.pkl` contienen "
-        "los modelos y sus respectivos "
-        "escaladores."
-    )
-
-    st.markdown("---")
-
-    st.caption(
-        "Los resultados son predictivos y "
-        "no constituyen un diagnóstico clínico."
-    )
+        st.stop()
