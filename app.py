@@ -1,13 +1,12 @@
 import os
-import pickle
-import numpy as np
+import joblib
 import pandas as pd
 import streamlit as st
 
 
-# ---------------------------------------------------------
-# 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS
-# ---------------------------------------------------------
+# =========================================================
+# 1. CONFIGURACIÓN DE LA PÁGINA
+# =========================================================
 
 st.set_page_config(
     page_title="Predicción de Salud Mental",
@@ -15,59 +14,66 @@ st.set_page_config(
     layout="wide"
 )
 
+
+# =========================================================
+# 2. ESTILOS
+# =========================================================
+
 st.markdown("""
 <style>
-    .metric-card {
-        background-color: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    }
 
-    .status-alert {
-        padding: 12px;
-        border-radius: 8px;
-        font-weight: 600;
-        text-align: center;
-        margin-top: 10px;
-    }
+.metric-card {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
 
-    .status-high {
-        background-color: #fee2e2;
-        color: #991b1b;
-        border: 1px solid #fca5a5;
-    }
+.status-alert {
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    text-align: center;
+    margin-top: 10px;
+}
 
-    .status-low {
-        background-color: #d1fae5;
-        color: #065f46;
-        border: 1px solid #6ee7b7;
-    }
+.status-high {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+
+.status-low {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+}
+
 </style>
 """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------
-# 2. CARGA DE MODELOS
-# ---------------------------------------------------------
-
-def load_model(filepath):
-    """
-    Carga un modelo serializado con pickle.
-    """
-
-    with open(filepath, "rb") as f:
-        return pickle.load(f)
-
+# =========================================================
+# 3. CARGAR MODELOS
+# =========================================================
 
 @st.cache_resource
 def load_trained_models():
 
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    modelos_dir = os.path.join(base_dir, "modelos")
+    # Directorio donde está app.py
+    base_dir = os.path.dirname(
+        os.path.abspath(__file__)
+    )
 
+    # Directorio modelos
+    modelos_dir = os.path.join(
+        base_dir,
+        "modelos"
+    )
+
+    # Archivos
     path_svr = os.path.join(
         modelos_dir,
         "best_svr_models.pkl"
@@ -81,21 +87,25 @@ def load_trained_models():
     svr_model = None
     gbr_model = None
 
-    # -----------------------------------------------------
-    # Cargar modelo SVR
-    # -----------------------------------------------------
+
+    # =====================================================
+    # CARGAR SVR
+    # =====================================================
 
     if not os.path.exists(path_svr):
 
         st.error(
-            f"❌ No se encontró el archivo SVR:\n{path_svr}"
+            "❌ No se encontró el archivo:\n\n"
+            f"{path_svr}"
         )
 
     else:
 
         try:
 
-            svr_model = load_model(path_svr)
+            # IMPORTANTE:
+            # usamos joblib.load()
+            svr_model = joblib.load(path_svr)
 
             st.success(
                 "✅ Modelo SVR cargado correctamente"
@@ -104,25 +114,30 @@ def load_trained_models():
         except Exception as e:
 
             st.error(
-                f"❌ Error cargando SVR: "
-                f"{type(e).__name__}: {e}"
+                "❌ Error cargando SVR"
             )
 
-    # -----------------------------------------------------
-    # Cargar modelo GBR
-    # -----------------------------------------------------
+            st.exception(e)
+
+
+    # =====================================================
+    # CARGAR GBR
+    # =====================================================
 
     if not os.path.exists(path_gbr):
 
         st.error(
-            f"❌ No se encontró el archivo GBR:\n{path_gbr}"
+            "❌ No se encontró el archivo:\n\n"
+            f"{path_gbr}"
         )
 
     else:
 
         try:
 
-            gbr_model = load_model(path_gbr)
+            # IMPORTANTE:
+            # usamos joblib.load()
+            gbr_model = joblib.load(path_gbr)
 
             st.success(
                 "✅ Modelo GBR cargado correctamente"
@@ -131,106 +146,103 @@ def load_trained_models():
         except Exception as e:
 
             st.error(
-                f"❌ Error cargando GBR: "
-                f"{type(e).__name__}: {e}"
+                "❌ Error cargando GBR"
             )
+
+            st.exception(e)
+
 
     return svr_model, gbr_model
 
 
+# Cargar modelos
 svr_model, gbr_model = load_trained_models()
 
 
-# ---------------------------------------------------------
-# 3. FUNCIONES DE PREDICCIÓN
-# ---------------------------------------------------------
+# =========================================================
+# 4. VERIFICAR ESTRUCTURA DE LOS MODELOS
+# =========================================================
 
-def predict_svr(modelos, data):
+if svr_model is not None:
 
-    """
-    Realiza las predicciones utilizando los tres modelos SVR.
+    required_keys_svr = [
+        "scaler",
+        "ansiedad",
+        "estres",
+        "depresion"
+    ]
 
-    Estructura esperada del PKL:
+    missing_svr = [
+        key
+        for key in required_keys_svr
+        if key not in svr_model
+    ]
 
-        scaler
-        ansiedad
-        estres
-        depresion
-    """
+    if missing_svr:
 
-    scaler = modelos["scaler"]
-
-    data_scaled = scaler.transform(data)
-
-    pred_ansiedad = modelos["ansiedad"].predict(data_scaled)
-
-    pred_estres = modelos["estres"].predict(data_scaled)
-
-    pred_depresion = modelos["depresion"].predict(data_scaled)
-
-    return (
-        float(pred_ansiedad[0]),
-        float(pred_estres[0]),
-        float(pred_depresion[0])
-    )
+        st.error(
+            "❌ El archivo SVR no contiene "
+            f"las claves esperadas: {missing_svr}"
+        )
 
 
-def predict_gbr(modelos, data):
+if gbr_model is not None:
 
-    """
-    Realiza las predicciones utilizando los tres modelos GBR.
+    required_keys_gbr = [
+        "scaler",
+        "ansiedad",
+        "estres",
+        "depresion"
+    ]
 
-    Estructura esperada del PKL:
+    missing_gbr = [
+        key
+        for key in required_keys_gbr
+        if key not in gbr_model
+    ]
 
-        ansiedad
-        estres
-        depresion
-        scaler
-    """
+    if missing_gbr:
 
-    scaler = modelos["scaler"]
-
-    data_scaled = scaler.transform(data)
-
-    pred_ansiedad = modelos["ansiedad"].predict(data_scaled)
-
-    pred_estres = modelos["estres"].predict(data_scaled)
-
-    pred_depresion = modelos["depresion"].predict(data_scaled)
-
-    return (
-        float(pred_ansiedad[0]),
-        float(pred_estres[0]),
-        float(pred_depresion[0])
-    )
+        st.error(
+            "❌ El archivo GBR no contiene "
+            f"las claves esperadas: {missing_gbr}"
+        )
 
 
-# ---------------------------------------------------------
-# 4. INTERFAZ PRINCIPAL
-# ---------------------------------------------------------
+# =========================================================
+# 5. TÍTULO
+# =========================================================
 
-st.title("🧠 Evaluación de Salud Mental")
+st.title(
+    "🧠 Evaluación de Salud Mental"
+)
 
 st.write(
     "Ingrese las variables descriptivas. "
-    "El sistema utilizará los modelos preentrenados "
-    "para calcular las predicciones."
+    "El sistema utilizará modelos preentrenados "
+    "para calcular los niveles de ansiedad, estrés "
+    "y depresión."
 )
 
 
-# ---------------------------------------------------------
-# 5. FORMULARIO
-# ---------------------------------------------------------
+# =========================================================
+# 6. FORMULARIO
+# =========================================================
 
-with st.form(key="mental_health_form"):
+with st.form(
+    key="mental_health_form"
+):
 
-    st.subheader("📋 Ingreso de Predictores")
+    st.subheader(
+        "📋 Ingreso de Predictores"
+    )
 
     col1, col2, col3 = st.columns(3)
 
-    # -----------------------------------------------------
+
+    # =====================================================
     # COLUMNA 1
-    # -----------------------------------------------------
+    # =====================================================
 
     with col1:
 
@@ -272,9 +284,10 @@ with st.form(key="mental_health_form"):
             value=7
         )
 
-    # -----------------------------------------------------
+
+    # =====================================================
     # COLUMNA 2
-    # -----------------------------------------------------
+    # =====================================================
 
     with col2:
 
@@ -306,9 +319,10 @@ with st.form(key="mental_health_form"):
             value=5
         )
 
-    # -----------------------------------------------------
+
+    # =====================================================
     # COLUMNA 3
-    # -----------------------------------------------------
+    # =====================================================
 
     with col3:
 
@@ -340,6 +354,11 @@ with st.form(key="mental_health_form"):
             value=4
         )
 
+
+    # =====================================================
+    # BOTÓN
+    # =====================================================
+
     submit_button = st.form_submit_button(
         label="🚀 Ejecutar Diagnóstico Predictivo",
         use_container_width=True,
@@ -347,329 +366,466 @@ with st.form(key="mental_health_form"):
     )
 
 
-# ---------------------------------------------------------
-# 6. PREDICCIÓN
-# ---------------------------------------------------------
+# =========================================================
+# 7. PREDICCIÓN
+# =========================================================
 
 if submit_button:
 
-    if svr_model is None or gbr_model is None:
+    # Verificar que ambos modelos existan
+
+    if svr_model is None:
 
         st.error(
-            "❌ No se pueden realizar las predicciones "
-            "porque uno o ambos modelos no pudieron cargarse."
+            "❌ El modelo SVR no está disponible."
         )
+
+        st.stop()
+
+
+    if gbr_model is None:
+
+        st.error(
+            "❌ El modelo GBR no está disponible."
+        )
+
+        st.stop()
+
+
+    # =====================================================
+    # 8. CODIFICACIÓN DEL SEXO
+    # =====================================================
+
+    if sexo == "Masculino":
+
+        sexo_masculino = 1
+        sexo_otro = 0
+
+    elif sexo == "Femenino":
+
+        sexo_masculino = 0
+        sexo_otro = 0
 
     else:
 
-        # -------------------------------------------------
-        # Encoding de sexo
-        # -------------------------------------------------
-
-        if sexo == "Masculino":
-
-            sexo_masculino = 1
-            sexo_otro = 0
-
-        elif sexo == "Femenino":
-
-            sexo_masculino = 0
-            sexo_otro = 0
-
-        else:
-
-            sexo_masculino = 0
-            sexo_otro = 1
+        sexo_masculino = 0
+        sexo_otro = 1
 
 
-        # -------------------------------------------------
-        # Construcción del DataFrame
-        # -------------------------------------------------
+    # =====================================================
+    # 9. CREAR DATAFRAME
+    # =====================================================
 
-        input_data = pd.DataFrame([{
+    input_data = pd.DataFrame([{
 
-            "edad": edad,
+        "edad": edad,
 
-            "horas_suenho": horas_suenho,
+        "horas_suenho": horas_suenho,
 
-            "actividad_fisica": actividad_fisica,
+        "actividad_fisica": actividad_fisica,
 
-            "apoyo_social": apoyo_social,
+        "apoyo_social": apoyo_social,
 
-            "eventos_estresantes": eventos_estresantes,
+        "eventos_estresantes": eventos_estresantes,
 
-            "rumiacion": rumiacion,
+        "rumiacion": rumiacion,
 
-            "autoestima": autoestima,
+        "autoestima": autoestima,
 
-            "perfeccionismo": perfeccionismo,
+        "perfeccionismo": perfeccionismo,
 
-            "incertidumbre": incertidumbre,
+        "incertidumbre": incertidumbre,
 
-            "cafeina": cafeina,
+        "cafeina": cafeina,
 
-            "carga_laboral": carga_laboral,
+        "carga_laboral": carga_laboral,
 
-            "responsabilidades_familiares":
-                responsabilidades_familiares,
+        "responsabilidades_familiares":
+            responsabilidades_familiares,
 
-            "sexo_masculino":
-                sexo_masculino,
+        "sexo_masculino":
+            sexo_masculino,
 
-            "sexo_otro":
-                sexo_otro
-        }])
+        "sexo_otro":
+            sexo_otro
 
-
-        # -------------------------------------------------
-        # Realizar predicciones
-        # -------------------------------------------------
-
-        with st.spinner(
-            "Procesando predicción..."
-        ):
-
-            try:
-
-                # =========================================
-                # SVR
-                # =========================================
-
-                (
-                    nivel_ansiedad_svr,
-                    nivel_estres_svr,
-                    nivel_depresion_svr
-                ) = predict_svr(
-                    svr_model,
-                    input_data
-                )
+    }])
 
 
-                # =========================================
-                # GBR
-                # =========================================
+    # =====================================================
+    # 10. REALIZAR PREDICCIONES
+    # =====================================================
 
-                (
-                    nivel_ansiedad_gbr,
-                    nivel_estres_gbr,
-                    nivel_depresion_gbr
-                ) = predict_gbr(
-                    gbr_model,
-                    input_data
-                )
+    with st.spinner(
+        "Procesando predicción..."
+    ):
 
+        try:
 
-                # =========================================
-                # MODELOS SELECCIONADOS PARA MOSTRAR
-                # =========================================
+            # =================================================
+            # SVR
+            # =================================================
 
-                nivel_ansiedad = nivel_ansiedad_svr
+            scaler_svr = svr_model["scaler"]
 
-                nivel_estres = nivel_estres_svr
-
-                nivel_depresion = nivel_depresion_gbr
+            datos_svr = scaler_svr.transform(
+                input_data
+            )
 
 
-                # =========================================
-                # Umbrales
-                # =========================================
+            nivel_ansiedad_svr = (
+                svr_model["ansiedad"]
+                .predict(datos_svr)[0]
+            )
 
-                ansiedad_threshold = 18
+            nivel_estres_svr = (
+                svr_model["estres"]
+                .predict(datos_svr)[0]
+            )
 
-                estres_threshold = 8
-
-                depresion_threshold = 5
-
-
-                # =========================================
-                # Estados
-                # =========================================
-
-                ansiedad_alta = (
-                    nivel_ansiedad >= ansiedad_threshold
-                )
-
-                estres_alto = (
-                    nivel_estres >= estres_threshold
-                )
-
-                depresion_alta = (
-                    nivel_depresion >= depresion_threshold
-                )
+            nivel_depresion_svr = (
+                svr_model["depresion"]
+                .predict(datos_svr)[0]
+            )
 
 
-                # =========================================
-                # Emojis
-                # =========================================
+            # =================================================
+            # GBR
+            # =================================================
 
-                ansiedad_emoji = (
-                    "😞" if ansiedad_alta else "😊"
-                )
+            scaler_gbr = gbr_model["scaler"]
 
-                estres_emoji = (
-                    "😞" if estres_alto else "😊"
-                )
-
-                depresion_emoji = (
-                    "😞" if depresion_alta else "😊"
-                )
+            datos_gbr = scaler_gbr.transform(
+                input_data
+            )
 
 
-            except Exception as e:
+            nivel_ansiedad_gbr = (
+                gbr_model["ansiedad"]
+                .predict(datos_gbr)[0]
+            )
 
-                st.error(
-                    "❌ Error durante la predicción"
-                )
+            nivel_estres_gbr = (
+                gbr_model["estres"]
+                .predict(datos_gbr)[0]
+            )
 
-                st.exception(e)
+            nivel_depresion_gbr = (
+                gbr_model["depresion"]
+                .predict(datos_gbr)[0]
+            )
 
-                st.stop()
+
+            # =================================================
+            # MODELOS PRINCIPALES
+            # =================================================
+            #
+            # Según tu aplicación:
+            #
+            # Ansiedad -> SVR
+            # Estrés   -> SVR
+            # Depresión -> GBR
+            #
+
+            nivel_ansiedad = float(
+                nivel_ansiedad_svr
+            )
+
+            nivel_estres = float(
+                nivel_estres_svr
+            )
+
+            nivel_depresion = float(
+                nivel_depresion_gbr
+            )
 
 
-        # -------------------------------------------------
-        # 7. PRESENTACIÓN DE RESULTADOS
-        # -------------------------------------------------
+        except Exception as e:
 
-        st.markdown("---")
+            st.error(
+                "❌ Error durante la predicción"
+            )
 
-        st.subheader(
-            "📊 Resultados de la Evaluación"
+            st.exception(e)
+
+            st.stop()
+
+
+    # =====================================================
+    # 11. UMBRALES
+    # =====================================================
+
+    ansiedad_threshold = 18
+
+    estres_threshold = 8
+
+    depresion_threshold = 5
+
+
+    # =====================================================
+    # 12. ESTADOS
+    # =====================================================
+
+    ansiedad_alta = (
+        nivel_ansiedad >= ansiedad_threshold
+    )
+
+    estres_alto = (
+        nivel_estres >= estres_threshold
+    )
+
+    depresion_alta = (
+        nivel_depresion >= depresion_threshold
+    )
+
+
+    # =====================================================
+    # 13. EMOJIS
+    # =====================================================
+
+    ansiedad_emoji = (
+        "😞"
+        if ansiedad_alta
+        else "😊"
+    )
+
+    estres_emoji = (
+        "😞"
+        if estres_alto
+        else "😊"
+    )
+
+    depresion_emoji = (
+        "😞"
+        if depresion_alta
+        else "😊"
+    )
+
+
+    # =====================================================
+    # 14. RESULTADOS
+    # =====================================================
+
+    st.markdown("---")
+
+    st.subheader(
+        "📊 Resultados de la Evaluación"
+    )
+
+
+    res_col1, res_col2, res_col3 = st.columns(3)
+
+
+    # =====================================================
+    # ANSIEDAD
+    # =====================================================
+
+    with res_col1:
+
+        st.markdown(
+            '<div class="metric-card">',
+            unsafe_allow_html=True
+        )
+
+        st.metric(
+            label="Ansiedad (SVR)",
+            value=f"{nivel_ansiedad:.2f}"
+        )
+
+        status_class = (
+            "status-high"
+            if ansiedad_alta
+            else "status-low"
+        )
+
+        status_text = (
+            "Elevado"
+            if ansiedad_alta
+            else "Normal"
+        )
+
+        st.markdown(
+            f"""
+            <div class="status-alert {status_class}">
+                {ansiedad_emoji}
+                {status_text}
+                (Umbral: {ansiedad_threshold})
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
         )
 
 
-        res_col1, res_col2, res_col3 = st.columns(3)
+    # =====================================================
+    # ESTRÉS
+    # =====================================================
+
+    with res_col2:
+
+        st.markdown(
+            '<div class="metric-card">',
+            unsafe_allow_html=True
+        )
+
+        st.metric(
+            label="Estrés (SVR)",
+            value=f"{nivel_estres:.2f}"
+        )
+
+        status_class = (
+            "status-high"
+            if estres_alto
+            else "status-low"
+        )
+
+        status_text = (
+            "Elevado"
+            if estres_alto
+            else "Normal"
+        )
+
+        st.markdown(
+            f"""
+            <div class="status-alert {status_class}">
+                {estres_emoji}
+                {status_text}
+                (Umbral: {estres_threshold})
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
 
 
-        # =================================================
-        # ANSIEDAD
-        # =================================================
+    # =====================================================
+    # DEPRESIÓN
+    # =====================================================
 
-        with res_col1:
+    with res_col3:
 
-            st.markdown(
-                '<div class="metric-card">',
-                unsafe_allow_html=True
-            )
+        st.markdown(
+            '<div class="metric-card">',
+            unsafe_allow_html=True
+        )
 
-            st.metric(
-                label="Ansiedad (SVR)",
-                value=f"{nivel_ansiedad:.2f}"
-            )
+        st.metric(
+            label="Depresión (GBR)",
+            value=f"{nivel_depresion:.2f}"
+        )
 
-            status_class = (
-                "status-high"
-                if ansiedad_alta
-                else "status-low"
-            )
+        status_class = (
+            "status-high"
+            if depresion_alta
+            else "status-low"
+        )
 
-            status_text = (
-                "Elevado"
-                if ansiedad_alta
-                else "Normal"
-            )
+        status_text = (
+            "Elevado"
+            if depresion_alta
+            else "Normal"
+        )
 
-            st.markdown(
-                f'''
-                <div class="status-alert {status_class}">
-                    {ansiedad_emoji}
-                    {status_text}
-                    (Umbral: {ansiedad_threshold})
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
+        st.markdown(
+            f"""
+            <div class="status-alert {status_class}">
+                {depresion_emoji}
+                {status_text}
+                (Umbral: {depresion_threshold})
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-            st.markdown(
-                "</div>",
-                unsafe_allow_html=True
-            )
-
-
-        # =================================================
-        # ESTRÉS
-        # =================================================
-
-        with res_col2:
-
-            st.markdown(
-                '<div class="metric-card">',
-                unsafe_allow_html=True
-            )
-
-            st.metric(
-                label="Estrés (SVR)",
-                value=f"{nivel_estres:.2f}"
-            )
-
-            status_class = (
-                "status-high"
-                if estres_alto
-                else "status-low"
-            )
-
-            status_text = (
-                "Elevado"
-                if estres_alto
-                else "Normal"
-            )
-
-            st.markdown(
-                f'''
-                <div class="status-alert {status_class}">
-                    {estres_emoji}
-                    {status_text}
-                    (Umbral: {estres_threshold})
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
-
-            st.markdown(
-                "</div>",
-                unsafe_allow_html=True
-            )
+        st.markdown(
+            "</div>",
+            unsafe_allow_html=True
+        )
 
 
-        # =================================================
-        # DEPRESIÓN
-        # =================================================
+    # =====================================================
+    # 15. COMPARACIÓN SVR vs GBR
+    # =====================================================
 
-        with res_col3:
+    st.markdown("---")
 
-            st.markdown(
-                '<div class="metric-card">',
-                unsafe_allow_html=True
-            )
+    st.subheader(
+        "🔎 Comparación de modelos"
+    )
 
-            st.metric(
-                label="Depresión (GBR)",
-                value=f"{nivel_depresion:.2f}"
-            )
+    comparacion = pd.DataFrame({
 
-            status_class = (
-                "status-high"
-                if depresion_alta
-                else "status-low"
-            )
+        "Variable": [
+            "Ansiedad",
+            "Estrés",
+            "Depresión"
+        ],
 
-            status_text = (
-                "Elevado"
-                if depresion_alta
-                else "Normal"
-            )
+        "SVR": [
+            nivel_ansiedad_svr,
+            nivel_estres_svr,
+            nivel_depresion_svr
+        ],
 
-            st.markdown(
-                f'''
-                <div class="status-alert {status_class}">
-                    {depresion_emoji}
-                    {status_text}
-                    (Umbral: {depresion_threshold})
-                </div>
-                ''',
-                unsafe_allow_html=True
-            )
+        "GBR": [
+            nivel_ansiedad_gbr,
+            nivel_estres_gbr,
+            nivel_depresion_gbr
+        ]
 
-            st.markdown(
-                "</div>",
-                unsafe_allow_html=True
-            )
+    })
+
+    comparacion["SVR"] = comparacion["SVR"].round(2)
+
+    comparacion["GBR"] = comparacion["GBR"].round(2)
+
+    st.dataframe(
+        comparacion,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+# =========================================================
+# 16. INFORMACIÓN DEL SISTEMA
+# =========================================================
+
+with st.sidebar:
+
+    st.header(
+        "ℹ️ Información"
+    )
+
+    st.write(
+        "Sistema de predicción basado "
+        "en modelos de Machine Learning."
+    )
+
+    st.write(
+        "**Modelos utilizados:**"
+    )
+
+    st.write(
+        "- SVR para ansiedad"
+    )
+
+    st.write(
+        "- SVR para estrés"
+    )
+
+    st.write(
+        "- GBR para depresión"
+    )
+
+    st.caption(
+        "Los resultados son predictivos y "
+        "no constituyen un diagnóstico clínico."
+    )
