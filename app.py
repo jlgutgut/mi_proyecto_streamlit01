@@ -127,27 +127,35 @@ if submit_button:
         with st.spinner("Procesando datos con los modelos SVR y GBR..."):
             try:
                 # 1. Inferencia del modelo SVR
-                # Devuelve un arreglo bidimensional [[depresion, ansiedad, estres]]
-                pred_svr = svr_model.predict(input_data).ravel()
+                pred_svr = svr_model.predict(input_data)
                 
-                # Usamos SVR para Ansiedad (índice 1) y Estrés (índice 2)
-                nivel_ansiedad = pred_svr[1]
-                nivel_estres = pred_svr[2]
+                # Aplanamos a un vector 1D independientemente de si viene como (1, 3) o (3,)
+                pred_svr_flat = pred_svr.flatten()
+                
+                # Verificación defensiva para evitar el crash del índice
+                if len(pred_svr_flat) >= 3:
+                    nivel_ansiedad = pred_svr_flat[1]  # Índice 1: Ansiedad
+                    nivel_estres = pred_svr_flat[2]    # Índice 2: Estrés
+                elif len(pred_svr_flat) == 1:
+                    # Si el modelo solo devolvió 1 valor
+                    nivel_ansiedad = pred_svr_flat[0]
+                    nivel_estres = 0.0
+                    st.warning("⚠️ El modelo SVR solo devolvió 1 valor en lugar de 3.")
                 
                 # 2. Inferencia del modelo GBR
-                # Devuelve un arreglo bidimensional [[depresion, ansiedad, estres]]
-                pred_gbr = gbr_model.predict(input_data).ravel()
+                pred_gbr = gbr_model.predict(input_data)
+                pred_gbr_flat = pred_gbr.flatten()
                 
-                # Usamos GBR para Depresión (índice 0)
-                nivel_depresion = pred_gbr[0]
-                
+                # Asignación para Depresión (Índice 0)
+                nivel_depresion = pred_gbr_flat[0]
+        
                 # E) REGLAS Y UMBRALES
                 ansiedad_threshold, estres_threshold, depresion_threshold = 18, 8, 5
                 
                 ansiedad_emoji = "😞" if nivel_ansiedad >= ansiedad_threshold else "😊"
                 estres_emoji = "😞" if nivel_estres >= estres_threshold else "😊"
                 depresion_emoji = "😞" if nivel_depresion >= depresion_threshold else "😊"
-
+        
                 # F) MOSTRAR RESULTADOS
                 st.markdown("---")
                 st.subheader("📊 Resultados de la Evaluación")
@@ -169,7 +177,7 @@ if submit_button:
                     status_text = "Elevado" if nivel_estres >= estres_threshold else "Normal"
                     st.markdown(f'<div class="status-alert {status_class}">{estres_emoji} {status_text} (Umbral: {estres_threshold})</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
-
+        
                 with res_col3:
                     st.markdown('<div class="metric-card">', unsafe_allow_html=True)
                     st.metric(label="Depresión (GBR)", value=f"{nivel_depresion:.2f}")
@@ -177,6 +185,6 @@ if submit_button:
                     status_text = "Elevado" if nivel_depresion >= depresion_threshold else "Normal"
                     st.markdown(f'<div class="status-alert {status_class}">{depresion_emoji} {status_text} (Umbral: {depresion_threshold})</div>', unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
-
+        
             except Exception as e:
                 st.error(f"⚠️ Error al realizar la predicción: {e}")
