@@ -125,28 +125,21 @@ if submit_button:
         }])
         
         with st.spinner("Procesando datos con los modelos SVR y GBR..."):
-            
-            # C) INFERENCIA SVR Y GBR (Todo dentro de un único bloque protegido)
             try:
-                # 1. Predicción SVR (Ansiedad y Estrés)
-                pred_svr = svr_model.predict(input_data)
+                # 1. Inferencia del modelo SVR
+                # Devuelve un arreglo bidimensional [[depresion, ansiedad, estres]]
+                pred_svr = svr_model.predict(input_data).ravel()
                 
-                if pred_svr.ndim > 1:
-                    nivel_ansiedad = pred_svr[0][0]
-                    nivel_estres = pred_svr[0][1]
-                else:
-                    nivel_ansiedad = pred_svr[0]
-                    nivel_estres = pred_svr[1]
+                # Usamos SVR para Ansiedad (índice 1) y Estrés (índice 2)
+                nivel_ansiedad = pred_svr[1]
+                nivel_estres = pred_svr[2]
                 
-                # 2. Predicción GBR (Depresión) 
-                # ⚠️ NOTA: Corregido de svr_model.predict a gbr_model.predict
-                pred_gbr = gbr_model.predict(input_data)
+                # 2. Inferencia del modelo GBR
+                # Devuelve un arreglo bidimensional [[depresion, ansiedad, estres]]
+                pred_gbr = gbr_model.predict(input_data).ravel()
                 
-                if pred_gbr.ndim > 1:
-                    nivel_depresion = pred_gbr[0][0]
-                    
-                else:
-                    nivel_depresion = pred_gbr[0]
+                # Usamos GBR para Depresión (índice 0)
+                nivel_depresion = pred_gbr[0]
                 
                 # E) REGLAS Y UMBRALES
                 ansiedad_threshold, estres_threshold, depresion_threshold = 18, 8, 5
@@ -155,7 +148,7 @@ if submit_button:
                 estres_emoji = "😞" if nivel_estres >= estres_threshold else "😊"
                 depresion_emoji = "😞" if nivel_depresion >= depresion_threshold else "😊"
 
-                # F) MOSTRAR RESULTADOS (Solo se ejecuta si la inferencia fue exitosa)
+                # F) MOSTRAR RESULTADOS
                 st.markdown("---")
                 st.subheader("📊 Resultados de la Evaluación")
                 
