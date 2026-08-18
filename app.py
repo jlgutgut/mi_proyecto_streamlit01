@@ -4,11 +4,13 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 import pickle
+import sys
 
 # ⚠️ IMPORTANTE: Es necesario importar estas clases explícitamente 
 # para que pickle reconozca el tipo de objeto guardado.
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
+sys.modules['GradientBoostingRegressor'] = sklearn.ensemble._gb
 
 # Configuración de la página
 st.set_page_config(
