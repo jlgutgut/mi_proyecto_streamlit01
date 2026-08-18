@@ -13,7 +13,10 @@ from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
 
 
-# 1. Configuración de la Página
+
+# ---------------------------------------------------------
+# 1. CONFIGURACIÓN DE LA PÁGINA
+# ---------------------------------------------------------
 st.set_page_config(
     page_title="Predicción de Salud Mental | SVR & GBR",
     page_icon="🧠",
@@ -37,31 +40,63 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 2. CARGA DE MODELOS (.pkl)
+# ---------------------------------------------------------
+# UNPICKLER PERSONALIZADO
+# ---------------------------------------------------------
+class CustomUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if module == 'GradientBoostingRegressor' or name == 'GradientBoostingRegressor':
+            return GradientBoostingRegressor
+        if module == 'SVR' or name == 'SVR':
+            return SVR
+        return super().find_class(module, name)
+
+# ---------------------------------------------------------
+# 2. CARGA DE PAQUETES (.pkl)
+# ---------------------------------------------------------
 @st.cache_resource
 def load_trained_models():
-    try:
-        svr_model = joblib.load('modelos/best_svr_models.pkl') 
-        gbr_model = joblib.load('modelos/best_gbr_models.pkl')
-        return svr_model, gbr_model
-    except FileNotFoundError as e:
-        st.error(f"⚠️ No se encontró el archivo del modelo: {e.filename}.")
-        return None, None
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    modelos_dir = os.path.join(base_dir, 'modelos')
+    
+    path_svr = os.path.join(modelos_dir, 'best_svr_models.pkl')
+    path_gbr = os.path.join(modelos_dir, 'best_gbr_models.pkl')
+    
+    pack_svr, pack_gbr = None, None
 
-svr_model, gbr_model = load_trained_models()
+    if os.path.exists(path_svr):
+        try:
+            with open(path_svr, 'rb') as f:
+                pack_svr = CustomUnpickler(f).load()
+        except Exception as e:
+            st.error(f"❌ Error al cargar best_svr_models.pkl: {e}")
 
-# 3. Interfaz Principal
+    if os.path.exists(path_gbr):
+        try:
+            with open(path_gbr, 'rb') as f:
+                pack_gbr = CustomUnpickler(f).load()
+        except Exception as e:
+            st.error(f"❌ Error al cargar best_gbr_models.pkl: {e}")
+
+    return pack_svr, pack_gbr
+
+pack_svr, pack_gbr = load_trained_models()
+
+# ---------------------------------------------------------
+# 3. INTERFAZ PRINCIPAL
+# ---------------------------------------------------------
 st.title("🧠 Evaluación de Salud Mental (SVR & GBR)")
 st.write("Ingrese las variables descriptivas. El sistema usará los modelos preentrenados para calcular la predicción.")
 
-# 4. Formulario de Entrada
+# ---------------------------------------------------------
+# 4. FORMULARIO DE ENTRADA
+# ---------------------------------------------------------
 with st.form(key="mental_health_form"):
     st.subheader("📋 Ingreso de Predictores")
     
     col1, col2, col3 = st.columns(3)
     with col1:
         edad = st.number_input("1. Edad", min_value=10, max_value=100, value=25)
-        # Aseguramos que las opciones incluyan "Otro"
         sexo = st.selectbox("2. Sexo", options=["Masculino", "Femenino", "Otro"])
         horas_suenho = st.number_input("3. Horas de Sueño", min_value=0.0, max_value=24.0, value=7.0, step=0.5)
         actividad_fisica = st.number_input("4. Actividad Física (Días)", min_value=0, max_value=7, value=3)
@@ -81,11 +116,13 @@ with st.form(key="mental_health_form"):
 
     submit_button = st.form_submit_button(label="🚀 Ejecutar Diagnóstico Predictivo", use_container_width=True, type="primary")
 
-# 5. Ejecución del modelo real (.predict)
+# ---------------------------------------------------------
+# 5. EJECUCIÓN E INFERENCIA DE LOS MODELOS
+# ---------------------------------------------------------
 if submit_button:
-    if svr_model is not None and gbr_model is not None:
+    if pack_svr is not None and pack_gbr is not None:
         
-        # A) LÓGICA DE ONE-HOT ENCODING (drop_first=True)
+        # A) LÓGICA DE ONE-HOT ENCODING
         if sexo == "Masculino":
             sexo_masculino = 1
             sexo_otro = 0
@@ -96,12 +133,7 @@ if submit_button:
             sexo_masculino = 0
             sexo_otro = 1
             
-        # B) CONSTRUCCIÓN DEL DATAFRAME
-        # ⚠️ IMPORTANTE: El orden de las claves en este diccionario DEBE SER EXACTAMENTE
-        # EL MISMO que el orden de las columnas de tu X_train al momento de hacer model.fit()
-        # Si usaste pd.get_dummies, normalmente las columnas nuevas se van al final.
-        # He colocado las nuevas variables de sexo al final como suele ser el estándar.
-        
+        # B) CONSTRUCCIÓN DEL DATAFRAME DE ENTRADA
         input_data = pd.DataFrame([{
             'edad': edad,
             'horas_suenho': horas_suenho,
@@ -119,22 +151,23 @@ if submit_button:
             'sexo_otro': sexo_otro
         }])
         
-        with st.spinner("Procesando datos con los modelos SVR y GBR..."):
+        with st.spinner("Procesando datos con los paquetes SVR y GBR..."):
             
-            # C) INFERENCIA SVR (Ansiedad y Estrés)
-            pred_svr = svr_model.predict(input_data)
+            # C) EXTRAER MODELOS Y SCALER DESDE LOS DICCIONARIOS
+            scaler_svr = pack_svr['scaler']
+            model_ansiedad = pack_svr['ansiedad']
+            model_estres = pack_svr['estres']
             
-            # Manejo por si SVR devuelve un array 2D
-            if pred_svr.ndim > 1:
-                nivel_ansiedad = pred_svr[0][0]
-                nivel_estres = pred_svr[0][1]
-            else:
-                nivel_ansiedad = pred_svr[0]
-                nivel_estres = pred_svr[1]
-                
-            # D) INFERENCIA GBR (Depresión)
-            pred_gbr = gbr_model.predict(input_data)
-            nivel_depresion = pred_gbr[0]
+            scaler_gbr = pack_gbr['scaler']
+            model_depresion = pack_gbr['depresion']
+            
+            # D) ESCALADO DE DATOS E INFERENCIA
+            input_scaled_svr = scaler_svr.transform(input_data)
+            nivel_ansiedad = model_ansiedad.predict(input_scaled_svr)[0]
+            nivel_estres = model_estres.predict(input_scaled_svr)[0]
+            
+            input_scaled_gbr = scaler_gbr.transform(input_data)
+            nivel_depresion = model_depresion.predict(input_scaled_gbr)[0]
             
             # E) REGLAS Y UMBRALES
             ansiedad_threshold, estres_threshold, depresion_threshold = 18, 8, 5
@@ -172,3 +205,5 @@ if submit_button:
             status_text = "Elevado" if nivel_depresion >= depresion_threshold else "Normal"
             st.markdown(f'<div class="status-alert {status_class}">{depresion_emoji} {status_text} (Umbral: {depresion_threshold})</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.error("⚠️ No se pudieron procesar las predicciones debido a un error al cargar los paquetes `.pkl`.")
