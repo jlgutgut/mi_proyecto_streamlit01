@@ -5,26 +5,35 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-import sklearn.ensemble
-import sklearn.svm
+# Mapeo explicito de modulos antes de importar scikit-learn
+import sklearn.ensemble._gb
+import sklearn.preprocessing._data
 import sklearn.preprocessing
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
 
-# --- TRUCO DE COMPATIBILIDAD (Evita errores al leer los .pkl) ---
+# Inyección de módulos en sys.modules para redirigir búsquedas de pickle
 sys.modules['GradientBoostingRegressor'] = GradientBoostingRegressor
 sys.modules['StandardScaler'] = StandardScaler
 sys.modules['SVR'] = SVR
 
-# 1. Configuración de la Página
+# Intentar importar dill para des-serialización robusta
+try:
+    import dill
+    HAS_DILL = True
+except ImportError:
+    HAS_DILL = False
+
+# ---------------------------------------------------------
+# 1. CONFIGURACIÓN DE PÁGINA Y ESTILOS
+# ---------------------------------------------------------
 st.set_page_config(
     page_title="Predicción de Salud Mental",
     page_icon="🧠",
     layout="wide"
 )
 
-# Estilos CSS
 st.markdown("""
 <style>
     .metric-card {
@@ -41,7 +50,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 2. Carga directa de los modelos .pkl
+# ---------------------------------------------------------
+# 2. CARGA DE MODELOS
+# ---------------------------------------------------------
+def load_file_robustly(filepath):
+    """Intenta cargar el archivo pkl con dill, y si falla usa pickle estándar."""
+    if HAS_DILL:
+        try:
+            with open(filepath, 'rb') as f:
+                return dill.load(f)
+        except Exception:
+            pass
+            
+    with open(filepath, 'rb') as f:
+        return pickle.load(f)
+
 @st.cache_resource
 def load_trained_models():
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -54,15 +77,13 @@ def load_trained_models():
 
     if os.path.exists(path_svr):
         try:
-            with open(path_svr, 'rb') as f:
-                svr_model = pickle.load(f)
+            svr_model = load_file_robustly(path_svr)
         except Exception as e:
             st.error(f"Error cargando SVR: {e}")
 
     if os.path.exists(path_gbr):
         try:
-            with open(path_gbr, 'rb') as f:
-                gbr_model = pickle.load(f)
+            gbr_model = load_file_robustly(path_gbr)
         except Exception as e:
             st.error(f"Error cargando GBR: {e}")
 
@@ -70,11 +91,12 @@ def load_trained_models():
 
 svr_model, gbr_model = load_trained_models()
 
-# 3. Interfaz Principal
+# ---------------------------------------------------------
+# 3. INTERFAZ Y FORMULARIO
+# ---------------------------------------------------------
 st.title("🧠 Evaluación de Salud Mental (SVR & GBR)")
 st.write("Ingrese las variables descriptivas. El sistema usará los modelos preentrenados para calcular la predicción.")
 
-# 4. Formulario de Entrada
 with st.form(key="mental_health_form"):
     st.subheader("📋 Ingreso de Predictores")
     
@@ -100,7 +122,9 @@ with st.form(key="mental_health_form"):
 
     submit_button = st.form_submit_button(label="🚀 Ejecutar Diagnóstico Predictivo", use_container_width=True, type="primary")
 
-# 5. Ejecución directa del predict
+# ---------------------------------------------------------
+# 4. PREDICCIÓN Y RESULTADOS
+# ---------------------------------------------------------
 if submit_button:
     if svr_model is not None and gbr_model is not None:
         
@@ -112,7 +136,7 @@ if submit_button:
         else:
             sexo_masculino, sexo_otro = 0, 1
             
-        # Construcción del DataFrame de Entrada
+        # Construcción del DataFrame
         input_data = pd.DataFrame([{
             'edad': edad,
             'horas_suenho': horas_suenho,
@@ -130,31 +154,41 @@ if submit_button:
             'sexo_otro': sexo_otro
         }])
         
-        with st.spinner("Procesando datos..."):
-            # A) Inferencia con SVR
-            pred_svr = svr_model.predict(input_data)
-            if pred_svr.ndim > 1:
-                nivel_ansiedad = float(pred_svr[0][0])
-                nivel_estres = float(pred_svr[0][1])
-            elif len(pred_svr) > 1:
-                nivel_ansiedad = float(pred_svr[0])
-                nivel_estres = float(pred_svr[1])
+        with st.spinner("Procesando predicción..."):
+            
+            # Función auxiliar para extraer predicciones de objetos/pipelines/diccionarios
+            def predict_from_model(model_obj, data):
+                if isinstance(model_obj, dict):
+                    # Si el pkl era un diccionario con modelo + scaler
+                    scaler = model_obj.get('scaler')
+                    estimator = model_obj.get('model') or model_obj.get('ansiedad') or model_obj.get('depresion')
+                    data_transformed = scaler.transform(data) if scaler else data
+                    return estimator.predict(data_transformed)
+                else:
+                    # Si el pkl es el estimador/pipeline directo
+                    return model_obj.predict(data)
+
+            # Predicción SVR
+            pred_svr = predict_from_model(svr_model, input_data)
+            if pred_svr.ndim > 1 or len(pred_svr) > 1:
+                nivel_ansiedad = float(pred_svr[0][0]) if pred_svr.ndim > 1 else float(pred_svr[0])
+                nivel_estres = float(pred_svr[0][1]) if pred_svr.ndim > 1 and pred_svr.shape[1] > 1 else (float(pred_svr[1]) if len(pred_svr) > 1 else 0.0)
             else:
                 nivel_ansiedad = float(pred_svr[0])
                 nivel_estres = 0.0
-                
-            # B) Inferencia con GBR
-            pred_gbr = gbr_model.predict(input_data)
+
+            # Predicción GBR
+            pred_gbr = predict_from_model(gbr_model, input_data)
             nivel_depresion = float(pred_gbr[0])
-            
+
             # Umbrales
             ansiedad_threshold, estres_threshold, depresion_threshold = 18, 8, 5
             
             ansiedad_emoji = "😞" if nivel_ansiedad >= ansiedad_threshold else "😊"
             estres_emoji = "😞" if nivel_estres >= estres_threshold else "😊"
             depresion_emoji = "😞" if nivel_depresion >= depresion_threshold else "😊"
-        
-        # Resultados
+
+        # Presentación visual de resultados
         st.markdown("---")
         st.subheader("📊 Resultados de la Evaluación")
         
