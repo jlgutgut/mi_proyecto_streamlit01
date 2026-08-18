@@ -20,58 +20,92 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# 1. FUNCIÓN PARA CARGAR EL MODELO
+# UNPICKLER PERSONALIZADO
+# ---------------------------------------------------------
+class CustomUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        # Redirecciones para el modelo GBR
+        if module == 'GradientBoostingRegressor' or name == 'GradientBoostingRegressor':
+            return GradientBoostingRegressor
+        # Redirecciones para el modelo SVR
+        if module == 'SVR' or name == 'SVR':
+            return SVR
+        return super().find_class(module, name)
+
+# ---------------------------------------------------------
+# FUNCIÓN PARA CARGAR AMBOS MODELOS
 # ---------------------------------------------------------
 @st.cache_resource
-def load_trained_models():
+def load_all_models():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    path_gbr = os.path.join(base_dir, 'modelos', 'best_gbr_models.pkl')
     
-    if not os.path.exists(path_gbr):
-        st.error(f"❌ No se encontró el archivo del modelo en: {path_gbr}")
-        return None
+    path_gbr = os.path.join(base_dir, 'modelos', 'best_gbr_models.pkl')
+    path_svr = os.path.join(base_dir, 'modelos', 'best_svr_models.pkl')
+    
+    pack_gbr = None
+    pack_svr = None
 
-    try:
-        with open(path_gbr, 'rb') as f:
-            pack = pickle.load(f)
-        return pack
-    except Exception as e:
-        st.error(f"❌ Error al cargar el archivo .pkl: {e}")
-        return None
+    # Cargar modelo GBR
+    if os.path.exists(path_gbr):
+        try:
+            with open(path_gbr, 'rb') as f:
+                pack_gbr = CustomUnpickler(f).load()
+        except Exception as e:
+            st.error(f"❌ Error al cargar best_gbr_models.pkl: {e}")
+    else:
+        st.error(f"❌ No se encontró el archivo: {path_gbr}")
 
-# Cargar el paquete
-pack = load_trained_models()
+    # Cargar modelo SVR
+    if os.path.exists(path_svr):
+        try:
+            with open(path_svr, 'rb') as f:
+                pack_svr = CustomUnpickler(f).load()
+        except Exception as e:
+            st.error(f"❌ Error al cargar best_svr_models.pkl: {e}")
+    else:
+        st.error(f"❌ No se encontró el archivo: {path_svr}")
+
+    return pack_gbr, pack_svr
+
+# Cargar ambos paquetes
+pack_gbr, pack_svr = load_all_models()
 
 # ---------------------------------------------------------
-# 2. INTERFAZ DE LA APLICACIÓN
+# INTERFAZ Y SELECCIÓN DE MODELO
 # ---------------------------------------------------------
 st.title("🧠 Evaluación Predictiva de Salud Mental")
-st.write("Ingrese los datos del usuario en el formulario para obtener las estimaciones de Niveles de Ansiedad, Estrés y Depresión.")
 
-if pack is not None:
-    # Extraer componentes del paquete
-    model_ansiedad = pack['ansiedad']
-    model_estres = pack['estres']
-    model_depresion = pack['depresion']
-    scaler = pack['scaler']
+if pack_gbr is not None and pack_svr is not None:
+    
+    # Permite al usuario elegir qué algoritmo desea utilizar
+    modelo_seleccionado = st.radio(
+        "Seleccione el algoritmo de predicción:",
+        ["Gradient Boosting (GBR)", "Support Vector Regressor (SVR)"],
+        horizontal=True
+    )
 
+    # Asignar el paquete según la elección
+    if modelo_seleccionado == "Gradient Boosting (GBR)":
+        current_pack = pack_gbr
+    else:
+        current_pack = pack_svr
+
+    # Extraer componentes del paquete seleccionado
+    model_ansiedad = current_pack['ansiedad']
+    model_estres = current_pack['estres']
+    model_depresion = current_pack['depresion']
+    scaler = current_pack['scaler']
+
+    # --- BARRA LATERAL CON FORMULARIO ---
     st.sidebar.header("📋 Formulario de Entrada")
-
-    # --- CAMPOS DE ENTRADA EN LA BARRA LATERAL ---
-    # NOTA: Ajusta estos valores y nombres según las variables reales con las que entrenaste el modelo.
     edad = st.sidebar.number_input("Edad", min_value=12, max_value=100, value=25)
     horas_sueño = st.sidebar.slider("Horas de sueño diarias", min_value=1.0, max_value=12.0, value=7.0, step=0.5)
     actividad_fisica = st.sidebar.slider("Horas de ejercicio por semana", min_value=0, max_value=20, value=3)
     nivel_estudio_trabajo = st.sidebar.selectbox("Carga de Trabajo/Estudio (1: Baja, 5: Muy Alta)", [1, 2, 3, 4, 5], index=2)
     consumo_cafeina = st.sidebar.slider("Tazas de café/energizantes al día", min_value=0, max_value=10, value=1)
 
-    # Botón para ejecutar la predicción
     if st.sidebar.button("📊 Realizar Predicción", type="primary"):
-        
-        # ---------------------------------------------------------
-        # 3. PREPARACIÓN Y ESCALADO DE DATOS
-        # ---------------------------------------------------------
-        # ⚠️ IMPORTANTE: Mantén exactamente el mismo orden de variables que usaste en Colab.
+        # Crear DataFrame de entrada
         input_data = pd.DataFrame([{
             'edad': edad,
             'horas_sueño': horas_sueño,
@@ -80,37 +114,28 @@ if pack is not None:
             'consumo_cafeina': consumo_cafeina
         }])
 
-        # Escalar los datos con el StandardScaler cargado
+        # Escalar los datos con el scaler correspondiente al modelo seleccionado
         input_scaled = scaler.transform(input_data)
 
-        # ---------------------------------------------------------
-        # 4. GENERAR PREDICCIONES
-        # ---------------------------------------------------------
+        # Generar predicciones
         pred_ansiedad = model_ansiedad.predict(input_scaled)[0]
         pred_estres = model_estres.predict(input_scaled)[0]
         pred_depresion = model_depresion.predict(input_scaled)[0]
 
-        # ---------------------------------------------------------
-        # 5. MOSTRAR RESULTADOS
-        # ---------------------------------------------------------
-        st.subheader("🎯 Resultados Estimados")
-        
+        # Mostrar Resultados
+        st.subheader(f"🎯 Resultados Estimados ({modelo_seleccionado})")
         col1, col2, col3 = st.columns(3)
 
         with col1:
             st.metric(label="Nivel de Ansiedad", value=f"{pred_ansiedad:.2f}")
-            st.progress(min(max(float(pred_ansiedad) / 100.0, 0.0), 1.0))
 
         with col2:
             st.metric(label="Nivel de Estrés", value=f"{pred_estres:.2f}")
-            st.progress(min(max(float(pred_estres) / 100.0, 0.0), 1.0))
 
         with col3:
             st.metric(label="Nivel de Depresión", value=f"{pred_depresion:.2f}")
-            st.progress(min(max(float(pred_depresion) / 100.0, 0.0), 1.0))
 
-        # Cuadro informativo de resumen
-        st.success("✅ Predicción completada utilizando modelos Gradient Boosting Regressor.")
+        st.success(f"✅ Predicción ejecutada con éxito utilizando {modelo_seleccionado}.")
 
 else:
-    st.warning("⚠️ No se pudo inicializar la aplicación porque los modelos no se cargaron correctamente.")
+    st.warning("⚠️ Asegúrate de que ambos archivos (`best_gbr_models.pkl` y `best_svr_models.pkl`) estén presentes en la carpeta `/modelos/`.")
