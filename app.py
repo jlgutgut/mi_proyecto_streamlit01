@@ -20,52 +20,25 @@ st.set_page_config(
 )
 
 # ---------------------------------------------------------
-# UNPICKLER PERSONALIZADO
-# ---------------------------------------------------------
-class CustomUnpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        # Redirecciones para el modelo GBR
-        if module == 'GradientBoostingRegressor' or name == 'GradientBoostingRegressor':
-            return GradientBoostingRegressor
-        # Redirecciones para el modelo SVR
-        if module == 'SVR' or name == 'SVR':
-            return SVR
-        return super().find_class(module, name)
-
-# ---------------------------------------------------------
 # FUNCIÓN PARA CARGAR AMBOS MODELOS
 # ---------------------------------------------------------
 @st.cache_resource
+import os
+import joblib
+import streamlit as st
+
+@st.cache_resource
 def load_all_models():
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    path_gbr = os.path.join(base_dir, 'modelos', 'best_gbr_models.pkl')
-    path_svr = os.path.join(base_dir, 'modelos', 'best_svr_models.pkl')
-    
-    pack_gbr = None
-    pack_svr = None
 
-    # Cargar modelo GBR
-    if os.path.exists(path_gbr):
-        try:
-            with open(path_gbr, 'rb') as f:
-                pack_gbr = CustomUnpickler(f).load()
-        except Exception as e:
-            st.error(f"❌ Error al cargar best_gbr_models.pkl: {e}")
-    else:
-        st.error(f"❌ No se encontró el archivo: {path_gbr}")
+    path_gbr = os.path.join(base_dir, 'modelos', 'best_gbr_models.joblib')
+    path_svr = os.path.join(base_dir, 'modelos', 'best_svr_models.joblib')
 
-    # Cargar modelo SVR
-    if os.path.exists(path_svr):
-        try:
-            with open(path_svr, 'rb') as f:
-                pack_svr = CustomUnpickler(f).load()
-        except Exception as e:
-            st.error(f"❌ Error al cargar best_svr_models.pkl: {e}")
-    else:
-        st.error(f"❌ No se encontró el archivo: {path_svr}")
+    pack_gbr = joblib.load(path_gbr) if os.path.exists(path_gbr) else None
+    pack_svr = joblib.load(path_svr) if os.path.exists(path_svr) else None
 
-    return pack_gbr, pack_svr
+    return pack_gbr, pack_svr 
+
 
 # Cargar ambos paquetes
 pack_gbr, pack_svr = load_all_models()
