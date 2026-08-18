@@ -31,6 +31,7 @@ st.markdown("""
 # 2. CARGA DE MODELOS (.pkl)
 @st.cache_resource
 @st.cache_resource
+@st.cache_resource
 def load_trained_models():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     path_svr = os.path.join(base_dir, 'modelos', 'best_svr_models.pkl')
@@ -39,23 +40,10 @@ def load_trained_models():
     try:
         loaded_svr = joblib.load(path_svr)
         loaded_gbr = joblib.load(path_gbr)
-        
-        # Si se cargó un diccionario, extraemos el modelo real
-        if isinstance(loaded_svr, dict):
-            # Prueba con la clave que usaste al guardar (ej: 'model', 'estimator', etc.)
-            svr_model = loaded_svr.get('model') or loaded_svr.get('estimator') or list(loaded_svr.values())[0]
-        else:
-            svr_model = loaded_svr
-
-        if isinstance(loaded_gbr, dict):
-            gbr_model = loaded_gbr.get('model') or loaded_gbr.get('estimator') or list(loaded_gbr.values())[0]
-        else:
-            gbr_model = loaded_gbr
-            
-        return svr_model, gbr_model
-
+        return loaded_svr, loaded_gbr
     except Exception as e:
-        st.error(f"Error cargando los modelos: {e}")
+        # Mostramos el tipo exacto de error para diagnosticar mejor
+        st.error(f"⚠️ Error cargando los modelos ({type(e).__name__}): {e}")
         return None, None
 
 svr_model, gbr_model = load_trained_models()
