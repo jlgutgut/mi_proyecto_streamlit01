@@ -363,7 +363,52 @@ with st.form(
         type="primary"
     )
 
+#---------TEMPORAL------------
+st.write("================================")
+st.write("DIAGNÓSTICO DEL SCALER")
+st.write("================================")
 
+st.write(
+    "SVR - columnas del scaler:",
+    list(svr_model["scaler"].feature_names_in_)
+)
+
+st.write(
+    "SVR - número de columnas del scaler:",
+    len(svr_model["scaler"].feature_names_in_)
+)
+
+st.write(
+    "SVR - columnas del modelo:",
+    svr_model["feature_columns"]
+)
+
+st.write(
+    "SVR - número de columnas del modelo:",
+    len(svr_model["feature_columns"])
+)
+
+st.write(
+    "GBR - columnas del scaler:",
+    list(gbr_model["scaler"].feature_names_in_)
+)
+
+st.write(
+    "GBR - número de columnas del scaler:",
+    len(gbr_model["scaler"].feature_names_in_)
+)
+
+st.write(
+    "GBR - columnas del modelo:",
+    gbr_model["feature_columns"]
+)
+
+st.write(
+    "GBR - número de columnas del modelo:",
+    len(gbr_model["feature_columns"])
+)
+
+#---------------------------
 # =========================================================
 # 7. EJECUTAR PREDICCIÓN
 # =========================================================
