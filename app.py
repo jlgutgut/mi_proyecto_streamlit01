@@ -87,11 +87,6 @@ if submit_button:
             sexo_otro = 1
             
         # B) CONSTRUCCIÓN DEL DATAFRAME
-        # ⚠️ IMPORTANTE: El orden de las claves en este diccionario DEBE SER EXACTAMENTE
-        # EL MISMO que el orden de las columnas de tu X_train al momento de hacer model.fit()
-        # Si usaste pd.get_dummies, normalmente las columnas nuevas se van al final.
-        # He colocado las nuevas variables de sexo al final como suele ser el estándar.
-        
         input_data = pd.DataFrame([{
             'edad': edad,
             'horas_suenho': horas_suenho,
@@ -111,61 +106,64 @@ if submit_button:
         
         with st.spinner("Procesando datos con los modelos SVR y GBR..."):
             
-            # C) INFERENCIA SVR (Ansiedad y Estrés)
+            # C) INFERENCIA SVR Y GBR (Todo dentro de un único bloque protegido)
             try:
+                # 1. Predicción SVR (Ansiedad y Estrés)
                 pred_svr = svr_model.predict(input_data)
-            except Exception as e:
-                st.error(f"Error detallado en la predicción: {e}")
-            
-            # Manejo por si SVR devuelve un array 2D
-            if pred_svr.ndim > 1:
-                nivel_ansiedad = pred_svr[0][0]
-                nivel_estres = pred_svr[0][1]
-            else:
-                nivel_ansiedad = pred_svr[0]
-                nivel_estres = pred_svr[1]
                 
-            # D) INFERENCIA GBR (Depresión)
-            try:
-                pred_gbr = svr_model.predict(input_data)
-            except Exception as e:
-                st.error(f"Error detallado en la predicción: {e}")
+                if pred_svr.ndim > 1:
+                    nivel_ansiedad = pred_svr[0][0]
+                    nivel_estres = pred_svr[0][1]
+                else:
+                    nivel_ansiedad = pred_svr[0]
+                    nivel_estres = pred_svr[1]
                 
-            nivel_depresion = pred_gbr[0]
-            
-            # E) REGLAS Y UMBRALES
-            ansiedad_threshold, estres_threshold, depresion_threshold = 18, 8, 5
-            
-            ansiedad_emoji = "😞" if nivel_ansiedad >= ansiedad_threshold else "😊"
-            estres_emoji = "😞" if nivel_estres >= estres_threshold else "😊"
-            depresion_emoji = "😞" if nivel_depresion >= depresion_threshold else "😊"
-        
-        # F) MOSTRAR RESULTADOS
-        st.markdown("---")
-        st.subheader("📊 Resultados de la Evaluación")
-        
-        res_col1, res_col2, res_col3 = st.columns(3)
-        
-        with res_col1:
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric(label="Ansiedad (SVR)", value=f"{nivel_ansiedad:.2f}")
-            status_class = "status-high" if nivel_ansiedad >= ansiedad_threshold else "status-low"
-            status_text = "Elevado" if nivel_ansiedad >= ansiedad_threshold else "Normal"
-            st.markdown(f'<div class="status-alert {status_class}">{ansiedad_emoji} {status_text} (Umbral: {ansiedad_threshold})</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-        with res_col2:
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric(label="Estrés (SVR)", value=f"{nivel_estres:.2f}")
-            status_class = "status-high" if nivel_estres >= estres_threshold else "status-low"
-            status_text = "Elevado" if nivel_estres >= estres_threshold else "Normal"
-            st.markdown(f'<div class="status-alert {status_class}">{estres_emoji} {status_text} (Umbral: {estres_threshold})</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+                # 2. Predicción GBR (Depresión) 
+                # ⚠️ NOTA: Corregido de svr_model.predict a gbr_model.predict
+                pred_gbr = gbr_model.predict(input_data)
+                
+                if pred_gbr.ndim > 1:
+                    nivel_depresion = pred_gbr[0][0]
+                    
+                else:
+                    nivel_depresion = pred_gbr[0]
+                
+                # E) REGLAS Y UMBRALES
+                ansiedad_threshold, estres_threshold, depresion_threshold = 18, 8, 5
+                
+                ansiedad_emoji = "😞" if nivel_ansiedad >= ansiedad_threshold else "😊"
+                estres_emoji = "😞" if nivel_estres >= estres_threshold else "😊"
+                depresion_emoji = "😞" if nivel_depresion >= depresion_threshold else "😊"
 
-        with res_col3:
-            st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-            st.metric(label="Depresión (GBR)", value=f"{nivel_depresion:.2f}")
-            status_class = "status-high" if nivel_depresion >= depresion_threshold else "status-low"
-            status_text = "Elevado" if nivel_depresion >= depresion_threshold else "Normal"
-            st.markdown(f'<div class="status-alert {status_class}">{depresion_emoji} {status_text} (Umbral: {depresion_threshold})</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+                # F) MOSTRAR RESULTADOS (Solo se ejecuta si la inferencia fue exitosa)
+                st.markdown("---")
+                st.subheader("📊 Resultados de la Evaluación")
+                
+                res_col1, res_col2, res_col3 = st.columns(3)
+                
+                with res_col1:
+                    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+                    st.metric(label="Ansiedad (SVR)", value=f"{nivel_ansiedad:.2f}")
+                    status_class = "status-high" if nivel_ansiedad >= ansiedad_threshold else "status-low"
+                    status_text = "Elevado" if nivel_ansiedad >= ansiedad_threshold else "Normal"
+                    st.markdown(f'<div class="status-alert {status_class}">{ansiedad_emoji} {status_text} (Umbral: {ansiedad_threshold})</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                with res_col2:
+                    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+                    st.metric(label="Estrés (SVR)", value=f"{nivel_estres:.2f}")
+                    status_class = "status-high" if nivel_estres >= estres_threshold else "status-low"
+                    status_text = "Elevado" if nivel_estres >= estres_threshold else "Normal"
+                    st.markdown(f'<div class="status-alert {status_class}">{estres_emoji} {status_text} (Umbral: {estres_threshold})</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                with res_col3:
+                    st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+                    st.metric(label="Depresión (GBR)", value=f"{nivel_depresion:.2f}")
+                    status_class = "status-high" if nivel_depresion >= depresion_threshold else "status-low"
+                    status_text = "Elevado" if nivel_depresion >= depresion_threshold else "Normal"
+                    st.markdown(f'<div class="status-alert {status_class}">{depresion_emoji} {status_text} (Umbral: {depresion_threshold})</div>', unsafe_allow_html=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+            except Exception as e:
+                st.error(f"⚠️ Error al realizar la predicción: {e}")
