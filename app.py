@@ -15,23 +15,26 @@ st.set_page_config(
 # 1. CARGA DE MODELOS Y ESCALADOR DESDE DICCIONARIO NATIVO
 # -----------------------------------------------------------------------------
 @st.cache_resource
+@st.cache_resource
 def load_trained_models():
-    """
-    Carga los diccionarios .pkl que contienen los estimadores y el StandardScaler.
-    """
     base_dir = os.path.dirname(os.path.abspath(__file__))
     path_svr = os.path.join(base_dir, 'modelos', 'best_svr_models.pkl')
     path_gbr = os.path.join(base_dir, 'modelos', 'best_gbr_models.pkl')
     
+    # Comprobación de existencia de rutas
+    if not os.path.exists(path_svr):
+        st.error(f"❌ No se encontró el archivo SVR en: {path_svr}")
+        return None, None
+    if not os.path.exists(path_gbr):
+        st.error(f"❌ No se encontró el archivo GBR en: {path_gbr}")
+        return None, None
+
     try:
         pack_svr = joblib.load(path_svr)
         pack_gbr = joblib.load(path_gbr)
         return pack_svr, pack_gbr
-    except FileNotFoundError as e:
-        st.error(f"⚠️ No se encontró el archivo del modelo en la ruta: {e.filename}")
-        return None, None
     except Exception as e:
-        st.error(f"⚠️ Error al cargar los archivos de modelo ({type(e).__name__}): {e}")
+        st.error(f"⚠️ Error al abrir con joblib ({type(e).__name__}): {e}")
         return None, None
 
 # Cargar paquetes al iniciar la aplicación
