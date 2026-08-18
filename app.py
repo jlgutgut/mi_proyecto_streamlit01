@@ -6,12 +6,11 @@ import streamlit as st
 import pickle
 import sys
 import sklearn.ensemble
+import sklearn.svm
 
-# ⚠️ IMPORTANTE: Es necesario importar estas clases explícitamente 
-# para que pickle reconozca el tipo de objeto guardado.
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
-sys.modules['GradientBoostingRegressor'] = sklearn.ensemble._gb
 
 # Configuración de la página
 st.set_page_config(
