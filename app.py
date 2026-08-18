@@ -5,6 +5,11 @@ import pandas as pd
 import streamlit as st
 import pickle
 
+# ⚠️ IMPORTANTE: Es necesario importar estas clases explícitamente 
+# para que pickle reconozca el tipo de objeto guardado.
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.preprocessing import StandardScaler
+
 # Configuración de la página
 st.set_page_config(
     page_title="Predicción de Salud Mental",
