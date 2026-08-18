@@ -46,6 +46,7 @@ st.markdown("""
 # ---------------------------------------------------------
 @st.cache_resource
 def load_trained_models():
+    # Obtener ruta absoluta relativa a app.py
     base_dir = os.path.dirname(os.path.abspath(__file__))
     modelos_dir = os.path.join(base_dir, 'modelos')
     
@@ -54,19 +55,30 @@ def load_trained_models():
     
     pack_svr, pack_gbr = None, None
 
+    # Verificar si existe la carpeta 'modelos'
+    if not os.path.exists(modelos_dir):
+        st.error(f"📁 La carpeta de modelos NO existe en la ruta: `{modelos_dir}`")
+        return None, None
+
+    # Verificar y cargar best_svr_models.pkl
     if os.path.exists(path_svr):
         try:
             with open(path_svr, 'rb') as f:
-                pack_svr = CustomUnpickler(f).load()
+                pack_svr = pickle.load(f)
         except Exception as e:
-            st.error(f"❌ Error al cargar best_svr_models.pkl: {e}")
+            st.error(f"❌ Error al deserializar `best_svr_models.pkl`: {e}")
+    else:
+        st.error(f"⚠️ No se encontró el archivo: `{path_svr}`. Revisa si en GitHub la carpeta se llama 'modelos' (en minúsculas).")
 
+    # Verificar y cargar best_gbr_models.pkl
     if os.path.exists(path_gbr):
         try:
             with open(path_gbr, 'rb') as f:
-                pack_gbr = CustomUnpickler(f).load()
+                pack_gbr = pickle.load(f)
         except Exception as e:
-            st.error(f"❌ Error al cargar best_gbr_models.pkl: {e}")
+            st.error(f"❌ Error al deserializar `best_gbr_models.pkl`: {e}")
+    else:
+        st.error(f"⚠️ No se encontró el archivo: `{path_gbr}`. Revisa si en GitHub la carpeta se llama 'modelos' (en minúsculas).")
 
     return pack_svr, pack_gbr
 
