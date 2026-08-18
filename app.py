@@ -19,14 +19,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# ---------------------------------------------------------
-# FUNCIÓN PARA CARGAR AMBOS MODELOS
-# ---------------------------------------------------------
-@st.cache_resource
-import os
-import joblib
-import streamlit as st
-
 @st.cache_resource
 def load_all_models():
     base_dir = os.path.dirname(os.path.abspath(__file__))
