@@ -40,15 +40,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 # ---------------------------------------------------------
-# UNPICKLER PERSONALIZADO
+# UNPICKLER PERSONALIZADO CON SOPORTE PARA STANDARDSCALER
 # ---------------------------------------------------------
 class CustomUnpickler(pickle.Unpickler):
     def find_class(self, module, name):
+        # Redirección para GradientBoostingRegressor
         if module == 'GradientBoostingRegressor' or name == 'GradientBoostingRegressor':
             return GradientBoostingRegressor
+        # Redirección para SVR
         if module == 'SVR' or name == 'SVR':
             return SVR
+        # Redirección para StandardScaler (Resuelve el error actual)
+        if module == 'StandardScaler' or name == 'StandardScaler':
+            return StandardScaler
         return super().find_class(module, name)
 
 # ---------------------------------------------------------
