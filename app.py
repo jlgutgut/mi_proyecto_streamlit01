@@ -12,7 +12,10 @@ from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.svm import SVR
 from sklearn.preprocessing import StandardScaler
 
-
+# Inyectar las clases en sys.modules para que pickle las encuentre
+sys.modules['GradientBoostingRegressor'] = GradientBoostingRegressor
+sys.modules['StandardScaler'] = StandardScaler
+sys.modules['SVR'] = SVR
 
 # ---------------------------------------------------------
 # 1. CONFIGURACIÓN DE LA PÁGINA
