@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 import pickle
 import sys
+import sklearn.ensemble
 
 # ⚠️ IMPORTANTE: Es necesario importar estas clases explícitamente 
 # para que pickle reconozca el tipo de objeto guardado.
